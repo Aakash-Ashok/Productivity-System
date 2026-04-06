@@ -1,0 +1,65 @@
+{% extends 'admin/adminbase.html' %}
+
+{% block title %}Projects | Productivity System{% endblock %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <p class="eyebrow">Delivery Tracking</p>
+        <h2>Projects</h2>
+        <p class="muted">Track delivery status, deadlines, and completion progress across the projects visible to your role.</p>
+    </div>
+    {% if is_admin_role %}
+        <a class="button" href="{% url 'project-create' %}">Create Project</a>
+    {% endif %}
+</section>
+
+<section class="stats-grid">
+    <article class="stat-card">
+        <span>Total Projects</span>
+        <strong>{{ projects|length }}</strong>
+        <small>Projects currently visible in this workspace.</small>
+    </article>
+    <article class="stat-card">
+        <span>Review View</span>
+        <strong>Live</strong>
+        <small>Use milestones and tasks to move work from planning into execution.</small>
+    </article>
+</section>
+
+<section class="panel">
+    <h3>Project Directory</h3>
+    <p class="panel-subtitle muted">Use this table to review ownership, current status, deadline pressure, and project completion level.</p>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Team</th>
+                <th>Status</th>
+                <th>Deadline</th>
+                <th>Progress</th>
+                {% if is_admin_role %}<th>Admin Actions</th>{% endif %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for project in projects %}
+                <tr>
+                    <td>{{ project.name }}</td>
+                    <td>{{ project.team.name }}</td>
+                    <td>{{ project.status }}</td>
+                    <td>{{ project.deadline }}</td>
+                    <td>{{ project.progress }}%</td>
+                    {% if is_admin_role %}
+                        <td><a class="button ghost" href="{% url 'project-update' project.pk %}">Edit Project</a></td>
+                    {% endif %}
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="{% if is_admin_role %}6{% else %}5{% endif %}">No projects created yet.</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endblock %}
+

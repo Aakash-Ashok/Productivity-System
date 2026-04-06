@@ -1,0 +1,68 @@
+{% extends 'admin/adminbase.html' %}
+
+{% block title %}Leave Requests | Productivity System{% endblock %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <p class="eyebrow">Availability Management</p>
+        <h2>Leave Requests</h2>
+        <p class="muted">{% if can_manage_delivery or can_manage_org %}Review employee availability changes and approve requests that affect planning and delivery.{% else %}Create and track your leave requests in one place.{% endif %}</p>
+    </div>
+    <a class="button" href="{% url 'leave-request-create' %}">Request Leave</a>
+</section>
+
+<section class="stats-grid">
+    <article class="stat-card">
+        <span>Requests</span>
+        <strong>{{ leave_requests|length }}</strong>
+        <small>Leave records currently visible in your scope.</small>
+    </article>
+    <article class="stat-card">
+        <span>Workflow</span>
+        <strong>{% if can_manage_delivery or can_manage_org %}Review{% else %}Track{% endif %}</strong>
+        <small>{% if can_manage_delivery or can_manage_org %}Use this page to review and respond to leave changes quickly.{% else %}Monitor your request status and dates here.{% endif %}</small>
+    </article>
+</section>
+
+<section class="panel">
+    <h3>Leave Directory</h3>
+    <p class="panel-subtitle muted">Keep availability decisions visible so project planning and team capacity stay aligned.</p>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Employee</th>
+                <th>Dates</th>
+                <th>Status</th>
+                <th>Reason</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in leave_requests %}
+                <tr>
+                    <td>{{ item.employee.name }}</td>
+                    <td>{{ item.start_date }} to {{ item.end_date }}</td>
+                    <td>{{ item.get_status_display }}</td>
+                    <td>{{ item.reason }}</td>
+                    <td>
+                        {% if can_manage_delivery or can_manage_org %}
+                            {% if is_admin_role %}
+                                <span class="muted strong-label">Admin Actions:</span>
+                            {% endif %}
+                            <a href="{% url 'leave-request-review' item.pk %}">Review</a>
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="5">No leave requests available.</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endblock %}
+

@@ -1,0 +1,43 @@
+{% extends 'manager/managebase.html' %}
+
+{% block title %}Milestones | Productivity System{% endblock %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <p class="eyebrow">Project Milestones</p>
+        <h2>Milestones</h2>
+    </div>
+    {% if can_manage_delivery %}
+        <a class="button" href="{% url 'milestone-create' %}">Create Milestone</a>
+    {% endif %}
+</section>
+
+<section class="panel">
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Milestone</th>
+                <th>Project</th>
+                <th>Deadline</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for milestone in milestones %}
+                <tr>
+                    <td>{{ milestone.name }}</td>
+                    <td>{{ milestone.project.name }}</td>
+                    <td>{{ milestone.deadline }}</td>
+                    <td>{{ milestone.status }}</td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="4">No milestones yet.</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endblock %}
+

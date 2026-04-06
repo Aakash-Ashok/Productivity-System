@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+
+{% block title %}My Profile | Productivity System{% endblock %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <p class="eyebrow">Account</p>
+        <h2>My Profile</h2>
+        <p class="muted">Update your personal account information and employee profile details.</p>
+    </div>
+</section>
+
+<section class="stats-grid">
+    <article class="stat-card">
+        <span>Account</span>
+        <strong>{{ profile_user.username }}</strong>
+        <small>Your main login identity for this workspace.</small>
+    </article>
+    <article class="stat-card">
+        <span>Role</span>
+        <strong>{{ current_role|title }}</strong>
+        <small>Your current permission scope inside the system.</small>
+    </article>
+</section>
+
+<section class="panel-grid">
+    <article class="panel">
+        <h3>Profile Summary</h3>
+        <div class="detail-grid">
+            <p><strong>Username:</strong> {{ profile_user.username }}</p>
+            <p><strong>Email:</strong> {{ profile_user.email }}</p>
+            <p><strong>Role:</strong> {{ current_role }}</p>
+        {% if profile_employee %}
+            <p><strong>Team:</strong> {{ profile_employee.team.name|default:'Unassigned' }}</p>
+            <p><strong>Job Title:</strong> {{ profile_employee.job_title|default:'Not set' }}</p>
+        {% endif %}
+        </div>
+    </article>
+
+    <article class="panel form-panel">
+        <h3>Update Profile</h3>
+        <p class="panel-subtitle muted">Keep your account details current so communication and role-based access stay accurate.</p>
+        <form method="post" class="stack">
+            {% csrf_token %}
+            {{ form.as_p }}
+            <button class="button" type="submit">Save Profile</button>
+        </form>
+    </article>
+</section>
+{% endblock %}

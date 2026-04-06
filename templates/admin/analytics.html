@@ -1,0 +1,212 @@
+{% extends 'admin/adminbase.html' %}
+
+{% block title %}AI Analytics | Productivity System{% endblock %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <p class="eyebrow">Predictive Intelligence</p>
+        <h2>AI Analytics</h2>
+        {% if analytics_role == 'admin' %}
+            <p class="muted">System-wide AI analytics across all teams, projects, and employees.</p>
+        {% elif analytics_role == 'manager' %}
+            <p class="muted">AI analytics limited to your teams, projects, and team members.</p>
+        {% else %}
+            <p class="muted">Your personal AI performance insights and task-risk predictions.</p>
+        {% endif %}
+    </div>
+</section>
+
+<section class="split-layout">
+    <article class="hero-card">
+        <p class="eyebrow">Insight Summary</p>
+        <h3>{% if analytics_role == 'employee' %}Your work pattern at a glance{% else %}Operational insight for better decisions{% endif %}</h3>
+        <p class="muted">{% if analytics_role == 'employee' %}Track your current risk, recent task behavior, and the signals the AI engine uses to estimate your work outcomes.{% else %}Use these metrics to spot performance trends, delivery risk, workload imbalance, and team health before they affect deadlines.{% endif %}</p>
+        <div class="hero-points">
+            <div><strong>{{ high_risk_tasks|length }}</strong><br>{% if analytics_role == 'employee' %}current task alerts need your attention.{% else %}tasks are currently flagged with elevated deadline risk.{% endif %}</div>
+            <div><strong>{{ metrics|length }}</strong><br>performance records are included in this view.</div>
+            <div><strong>{{ trend_data|length }}</strong><br>trend points are available for productivity tracking.</div>
+        </div>
+    </article>
+    <article class="panel">
+        <h3>Analytics Focus</h3>
+        <div class="metric-list">
+            <div class="metric-tile">
+                <span class="muted">Risk alerts</span>
+                <strong>{{ high_risk_tasks|length }}</strong>
+            </div>
+            <div class="metric-tile">
+                <span class="muted">Trend points</span>
+                <strong>{{ trend_data|length }}</strong>
+            </div>
+            <div class="metric-tile">
+                <span class="muted">Performance rows</span>
+                <strong>{{ metrics|length }}</strong>
+            </div>
+            <div class="metric-tile">
+                <span class="muted">Scope</span>
+                <strong>{{ analytics_role|title }}</strong>
+            </div>
+        </div>
+    </article>
+</section>
+
+<section class="panel-grid">
+    <article class="panel">
+        <h3>{% if analytics_role == 'employee' %}My Task Risk Alerts{% else %}Deadline Risk Alerts{% endif %}</h3>
+        <p class="panel-subtitle muted">These tasks deserve a check-in because the model sees higher chance of delay.</p>
+        {% for task, risk in high_risk_tasks %}
+            <div class="list-row">
+                <div>
+                    <a href="{% url 'task-detail' task.pk %}">{{ task.title }}</a>
+                    <p class="muted">{{ task.project.name|default:'No project' }} | {{ task.assigned_to|default:'Unassigned' }}</p>
+                </div>
+                <span class="badge warning">{{ risk.label }} {{ risk.probability }}%</span>
+            </div>
+        {% empty %}
+            <p class="muted">No medium or high risk tasks right now.</p>
+        {% endfor %}
+    </article>
+
+    <article class="panel">
+        <h3>{% if analytics_role == 'employee' %}How Your AI Score Works{% else %}Model Usage{% endif %}</h3>
+        <ul class="plain-list">
+            <li>Linear Regression for predicted completion time</li>
+            <li>Random Forest Classifier for deadline risk</li>
+            <li>Weighted AI scoring for smart task allocation</li>
+            <li>Behavioral threshold analysis for burnout and anomaly detection</li>
+        </ul>
+    </article>
+
+    {% if analytics_role != 'employee' %}
+        <article class="panel">
+            <h3>AI Modules Included</h3>
+            <ul class="plain-list">
+                <li>Productivity prediction</li>
+                <li>Delay risk prediction</li>
+                <li>Smart task allocation</li>
+                <li>Workload balancing</li>
+                <li>Burnout detection</li>
+                <li>Anomaly detection</li>
+                <li>Team optimization</li>
+            </ul>
+        </article>
+    {% endif %}
+
+    <article class="panel wide">
+        <h3>Performance Analytics</h3>
+        <p class="panel-subtitle muted">This table summarizes employee output, completion speed, delay history, and active workload.</p>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Employee</th>
+                    <th>Team</th>
+                    <th>Completed</th>
+                    <th>Avg Completion Time</th>
+                    <th>Delayed Tasks</th>
+                    <th>Active Tasks</th>
+                    <th>Burnout Risk</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for metric in metrics %}
+                    <tr>
+                        <td>{{ metric.employee.name }}</td>
+                        <td>{{ metric.employee.team.name|default:'Unassigned' }}</td>
+                        <td>{{ metric.tasks_completed }}</td>
+                        <td>{{ metric.avg_completion_time }} days</td>
+                        <td>{{ metric.delayed_tasks }}</td>
+                        <td>{{ metric.active_tasks }}</td>
+                        <td>{{ metric.burnout_risk }}</td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="7">No analytics available yet.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </article>
+
+    {% if analytics_role != 'employee' %}
+        <article class="panel wide">
+            <h3>Project Progress Analytics</h3>
+            <p class="panel-subtitle muted">Review delivery momentum and current health across the projects in your scope.</p>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Project</th>
+                        <th>Team</th>
+                        <th>Status</th>
+                        <th>Deadline</th>
+                        <th>Progress</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in project_summary %}
+                        <tr>
+                            <td>{{ item.project.name }}</td>
+                            <td>{{ item.project.team.name }}</td>
+                            <td>{{ item.project.status }}</td>
+                            <td>{{ item.project.deadline }}</td>
+                            <td>{{ item.progress }}%</td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="5">No project analytics available yet.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </article>
+    {% endif %}
+
+    {% if analytics_role != 'employee' %}
+        <article class="panel wide">
+            <h3>Team Health Scores</h3>
+            <p class="panel-subtitle muted">These scores combine completion rate, active workload, and broader health indicators.</p>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Team</th>
+                        <th>Completion Rate</th>
+                        <th>Health Score</th>
+                        <th>Active Tasks</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in team_summary %}
+                        <tr>
+                            <td>{{ item.team.name }}</td>
+                            <td>{{ item.avg_completion_rate }}%</td>
+                            <td>{{ item.health_score }}</td>
+                            <td>{{ item.active_tasks }}</td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="4">No team health data available.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </article>
+    {% endif %}
+
+    <article class="panel wide">
+        <h3>Productivity Trend</h3>
+        <p class="panel-subtitle muted">Daily trend view of logged hours and completed work.</p>
+        <div class="chart-list">
+            {% for item in trend_data %}
+                <div class="chart-row">
+                    <span>{{ item.date }}</span>
+                    <div class="bar-track"><div class="bar-fill" style="width:{% widthratio item.hours 10 100 %}%"></div></div>
+                    <strong>{{ item.hours }}h / {{ item.completed }} done</strong>
+                </div>
+            {% empty %}
+                <p class="muted">Trend data will appear as more logs and completions are recorded.</p>
+            {% endfor %}
+        </div>
+    </article>
+</section>
+{% endblock %}
+

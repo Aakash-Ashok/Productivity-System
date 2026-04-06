@@ -1,0 +1,69 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Manager | Productivity System{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'core/styles.css' %}">
+</head>
+<body class="app-body">
+    <div class="shell">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <p class="eyebrow">Manager Workspace</p>
+                <h1>Productivity System</h1>
+                <p class="muted sidebar-summary">Team delivery, approvals, planning, and project execution for your assigned scope.</p>
+                <span class="sidebar-role">Manager</span>
+            </div>
+            <nav class="nav">
+                <p class="nav-group">Manager</p>
+                <a class="{% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}">Dashboard</a>
+                <a class="{% if request.resolver_match.url_name == 'employee-list' or request.resolver_match.url_name == 'employee-update' %}active{% endif %}" href="{% url 'employee-list' %}">Team</a>
+                <a class="{% if request.resolver_match.url_name == 'project-list' or request.resolver_match.url_name == 'project-update' %}active{% endif %}" href="{% url 'project-list' %}">Projects</a>
+                <a class="{% if request.resolver_match.url_name == 'task-list' or request.resolver_match.url_name == 'task-create' or request.resolver_match.url_name == 'task-update' or request.resolver_match.url_name == 'task-detail' %}active{% endif %}" href="{% url 'task-list' %}">Tasks</a>
+                <a class="{% if request.resolver_match.url_name == 'planning-hub' or request.resolver_match.url_name == 'milestone-list' or request.resolver_match.url_name == 'milestone-create' or request.resolver_match.url_name == 'recurring-task-list' or request.resolver_match.url_name == 'recurring-task-create' or request.resolver_match.url_name == 'kanban-board' or request.resolver_match.url_name == 'calendar-view' %}active{% endif %}" href="{% url 'planning-hub' %}">Planning</a>
+                <a class="{% if request.resolver_match.url_name == 'approval-queue' or request.resolver_match.url_name == 'task-approve' %}active{% endif %}" href="{% url 'approval-queue' %}">Manager Approval Queue</a>
+                <a class="{% if request.resolver_match.url_name == 'performance-review-list' or request.resolver_match.url_name == 'performance-review-create' %}active{% endif %}" href="{% url 'performance-review-list' %}">Reviews</a>
+                <a class="{% if request.resolver_match.url_name == 'leave-request-list' or request.resolver_match.url_name == 'leave-request-review' %}active{% endif %}" href="{% url 'leave-request-list' %}">Leave</a>
+                <a class="{% if request.resolver_match.url_name == 'analytics' %}active{% endif %}" href="{% url 'analytics' %}">AI Insights</a>
+                <a class="{% if request.resolver_match.url_name == 'notification-list' %}active{% endif %}" href="{% url 'notification-list' %}">Notifications</a>
+            </nav>
+            <div class="sidebar-footer">
+                {% if user.is_authenticated %}
+                    <div class="user-chip">
+                        <strong>{{ user.username }}</strong>
+                        <p class="muted">Role: Manager</p>
+                    </div>
+                    <a class="button ghost full-width" href="{% url 'profile' %}">Profile</a>
+                    <a class="button ghost full-width" href="{% url 'password_change' %}">Change Password</a>
+                    <form method="post" action="{% url 'logout' %}">
+                        {% csrf_token %}
+                        <button class="button ghost full-width" type="submit">Logout</button>
+                    </form>
+                {% endif %}
+            </div>
+        </aside>
+        <main class="content">
+            <div class="content-shell">
+                <section class="topbar">
+                    <div class="topbar-copy">
+                        <h2>Manager Workspace</h2>
+                        <p class="muted">Your projects, your team, and the approvals or risks that need action next.</p>
+                    </div>
+                    <div class="topbar-actions">
+                        <span class="pill primary">{{ user.username }}</span>
+                        <span class="pill">Manager</span>
+                    </div>
+                </section>
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="flash">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+</body>
+</html>

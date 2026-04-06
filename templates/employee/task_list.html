@@ -1,0 +1,88 @@
+{% extends 'employee/employeebase.html' %}
+
+{% block title %}Tasks | Productivity System{% endblock %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <p class="eyebrow">Execution Board</p>
+        <h2>{{ task_scope_label }}</h2>
+        <p class="muted">Filter work by project and assignment state, then open any task to update progress, review AI signals, or log execution details.</p>
+    </div>
+    <div class="actions">
+        <a class="button ghost" href="{% url 'kanban-board' %}">Kanban</a>
+        <a class="button ghost" href="{% url 'calendar-view' %}">Calendar</a>
+        {% if can_manage_delivery %}
+            <a class="button" href="{% url 'task-create' %}">Create Task</a>
+        {% endif %}
+    </div>
+</section>
+
+<section class="stats-grid">
+    <article class="stat-card">
+        <span>Visible Tasks</span>
+        <strong>{{ tasks|length }}</strong>
+        <small>Tasks available in your current role scope and filters.</small>
+    </article>
+    <article class="stat-card">
+        <span>Planning Views</span>
+        <strong>2</strong>
+        <small>Switch between kanban and calendar for faster coordination.</small>
+    </article>
+</section>
+
+<section class="panel">
+    <h3>Task Directory</h3>
+    <p class="panel-subtitle muted">Open any task to review assignments, progress, AI guidance, and collaboration history.</p>
+    <form method="get" class="filter-row">
+        <select name="project">
+            <option value="">All Projects</option>
+            {% for project in project_filters %}
+                <option value="{{ project.id }}" {% if selected_project == project.id|stringformat:"s" %}selected{% endif %}>
+                    {{ project.name }}
+                </option>
+            {% endfor %}
+        </select>
+        <select name="assignment">
+            <option value="">All Assignment States</option>
+            <option value="assigned" {% if selected_assignment == 'assigned' %}selected{% endif %}>Assigned</option>
+            <option value="unassigned" {% if selected_assignment == 'unassigned' %}selected{% endif %}>Unassigned</option>
+        </select>
+        <button class="button" type="submit">Filter</button>
+    </form>
+
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Title</th>
+                <th>Project</th>
+                <th>Team</th>
+                <th>Assigned To</th>
+                <th>Priority</th>
+                <th>Status</th>
+                <th>Deadline</th>
+                <th>Progress</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for task in tasks %}
+                <tr>
+                    <td><a href="{% url 'task-detail' task.pk %}">{{ task.title }}</a></td>
+                    <td>{{ task.project.name|default:'No project' }}</td>
+                    <td>{{ task.project.team.name|default:'No team' }}</td>
+                    <td>{{ task.assigned_to|default:'Unassigned' }}</td>
+                    <td>{{ task.priority }}</td>
+                    <td>{{ task.status }}</td>
+                    <td>{{ task.deadline }}</td>
+                    <td>{{ task.progress }}%</td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="8">No tasks created yet.</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endblock %}
+

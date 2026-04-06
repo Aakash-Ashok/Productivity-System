@@ -1,0 +1,61 @@
+{% extends 'employee/employeebase.html' %}
+
+{% block title %}Approvals | Productivity System{% endblock %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <p class="eyebrow">Approval Workspace</p>
+        <h2>Manager Approval Queue</h2>
+        <p class="muted">Pending task submissions for approval and leave requests that need review.</p>
+    </div>
+</section>
+
+<section class="stats-grid">
+    <article class="stat-card">
+        <span>Task Approvals</span>
+        <strong>{{ approval_tasks|length }}</strong>
+        <small>Submitted tasks currently waiting for a decision.</small>
+    </article>
+    <article class="stat-card">
+        <span>Leave Reviews</span>
+        <strong>{{ leave_requests|length }}</strong>
+        <small>Availability requests that may affect planning or delivery.</small>
+    </article>
+</section>
+
+<section class="panel-grid">
+    <article class="panel wide">
+        <h3>Task Approvals</h3>
+        <p class="panel-subtitle muted">Review completed work before it moves to final approved status.</p>
+        {% for task in approval_tasks %}
+            <div class="list-row">
+                <div>
+                    <a href="{% url 'task-detail' task.pk %}">{{ task.title }}</a>
+                    <p class="muted">{{ task.project.name|default:'No project' }} | {{ task.assigned_to|default:'Unassigned' }}</p>
+                </div>
+                <a class="button" href="{% url 'task-approve' task.pk %}">Review</a>
+            </div>
+        {% empty %}
+            <p class="muted">No task approvals pending.</p>
+        {% endfor %}
+    </article>
+
+    <article class="panel wide">
+        <h3>Leave Requests</h3>
+        <p class="panel-subtitle muted">Respond quickly to availability changes so schedules stay realistic.</p>
+        {% for item in leave_requests %}
+            <div class="list-row">
+                <div>
+                    <strong>{{ item.employee.name }}</strong>
+                    <p class="muted">{{ item.start_date }} to {{ item.end_date }}</p>
+                </div>
+                <a class="button ghost" href="{% url 'leave-request-review' item.pk %}">Review</a>
+            </div>
+        {% empty %}
+            <p class="muted">No leave approvals pending.</p>
+        {% endfor %}
+    </article>
+</section>
+{% endblock %}
+

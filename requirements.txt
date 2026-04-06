@@ -1,0 +1,4 @@
+django==6.0.3
+pandas==3.0.2
+psycopg2-binary==2.9.11
+scikit-learn==1.8.0

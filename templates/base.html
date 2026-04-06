@@ -1,0 +1,97 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Productivity System{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'core/styles.css' %}">
+</head>
+<body class="app-body">
+    <div class="shell">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <p class="eyebrow">AI Workplace Suite</p>
+                <h1>Productivity System</h1>
+                <p class="muted sidebar-summary">Track delivery, manage teams, and surface predictive signals from real execution data.</p>
+                {% if user.is_authenticated %}
+                    <span class="sidebar-role">{{ current_role|default:"Workspace Access"|title }}</span>
+                {% endif %}
+            </div>
+            <nav class="nav">
+                {% if is_admin_role %}
+                    <p class="nav-group">Admin</p>
+                    <a class="{% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}">Dashboard</a>
+                    <a class="{% if request.resolver_match.url_name == 'user-list' or request.resolver_match.url_name == 'user-create' or request.resolver_match.url_name == 'user-update' %}active{% endif %}" href="{% url 'user-list' %}">Users</a>
+                    <a class="{% if request.resolver_match.url_name == 'team-list' or request.resolver_match.url_name == 'team-create' or request.resolver_match.url_name == 'team-update' %}active{% endif %}" href="{% url 'team-list' %}">Teams</a>
+                    <a class="{% if request.resolver_match.url_name == 'employee-list' or request.resolver_match.url_name == 'employee-create' or request.resolver_match.url_name == 'employee-update' %}active{% endif %}" href="{% url 'employee-list' %}">Employees</a>
+                    <a class="{% if request.resolver_match.url_name == 'project-list' or request.resolver_match.url_name == 'project-create' or request.resolver_match.url_name == 'project-update' %}active{% endif %}" href="{% url 'project-list' %}">Projects</a>
+                    <a class="{% if request.resolver_match.url_name == 'task-list' or request.resolver_match.url_name == 'task-create' or request.resolver_match.url_name == 'task-update' or request.resolver_match.url_name == 'task-detail' %}active{% endif %}" href="{% url 'task-list' %}">Tasks</a>
+                    <a class="{% if request.resolver_match.url_name == 'planning-hub' or request.resolver_match.url_name == 'milestone-list' or request.resolver_match.url_name == 'milestone-create' or request.resolver_match.url_name == 'recurring-task-list' or request.resolver_match.url_name == 'recurring-task-create' or request.resolver_match.url_name == 'kanban-board' or request.resolver_match.url_name == 'calendar-view' %}active{% endif %}" href="{% url 'planning-hub' %}">Planning</a>
+                    <a class="{% if request.resolver_match.url_name == 'analytics' %}active{% endif %}" href="{% url 'analytics' %}">AI Insights</a>
+                    <a class="{% if request.resolver_match.url_name == 'audit-log-list' %}active{% endif %}" href="{% url 'audit-log-list' %}">Audit Logs</a>
+                    <a class="{% if request.resolver_match.url_name == 'notification-list' %}active{% endif %}" href="{% url 'notification-list' %}">Notifications</a>
+                {% elif is_manager_role %}
+                    <p class="nav-group">Manager</p>
+                    <a class="{% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}">Dashboard</a>
+                    <a class="{% if request.resolver_match.url_name == 'employee-list' or request.resolver_match.url_name == 'employee-update' %}active{% endif %}" href="{% url 'employee-list' %}">Team</a>
+                    <a class="{% if request.resolver_match.url_name == 'project-list' or request.resolver_match.url_name == 'project-update' %}active{% endif %}" href="{% url 'project-list' %}">Projects</a>
+                    <a class="{% if request.resolver_match.url_name == 'task-list' or request.resolver_match.url_name == 'task-create' or request.resolver_match.url_name == 'task-update' or request.resolver_match.url_name == 'task-detail' %}active{% endif %}" href="{% url 'task-list' %}">Tasks</a>
+                    <a class="{% if request.resolver_match.url_name == 'planning-hub' or request.resolver_match.url_name == 'milestone-list' or request.resolver_match.url_name == 'milestone-create' or request.resolver_match.url_name == 'recurring-task-list' or request.resolver_match.url_name == 'recurring-task-create' or request.resolver_match.url_name == 'kanban-board' or request.resolver_match.url_name == 'calendar-view' %}active{% endif %}" href="{% url 'planning-hub' %}">Planning</a>
+                    <a class="{% if request.resolver_match.url_name == 'approval-queue' or request.resolver_match.url_name == 'task-approve' %}active{% endif %}" href="{% url 'approval-queue' %}">Manager Approval Queue</a>
+                    <a class="{% if request.resolver_match.url_name == 'performance-review-list' or request.resolver_match.url_name == 'performance-review-create' %}active{% endif %}" href="{% url 'performance-review-list' %}">Reviews</a>
+                    <a class="{% if request.resolver_match.url_name == 'leave-request-list' or request.resolver_match.url_name == 'leave-request-review' %}active{% endif %}" href="{% url 'leave-request-list' %}">Leave</a>
+                    <a class="{% if request.resolver_match.url_name == 'analytics' %}active{% endif %}" href="{% url 'analytics' %}">AI Insights</a>
+                    <a class="{% if request.resolver_match.url_name == 'notification-list' %}active{% endif %}" href="{% url 'notification-list' %}">Notifications</a>
+                {% elif is_employee_role %}
+                    <p class="nav-group">Employee</p>
+                    <a class="{% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}">Dashboard</a>
+                    <a class="{% if request.resolver_match.url_name == 'task-list' or request.resolver_match.url_name == 'task-detail' or request.resolver_match.url_name == 'task-update' %}active{% endif %}" href="{% url 'task-list' %}">My Tasks</a>
+                    <a class="{% if request.resolver_match.url_name == 'planning-hub' or request.resolver_match.url_name == 'milestone-list' or request.resolver_match.url_name == 'recurring-task-list' or request.resolver_match.url_name == 'kanban-board' or request.resolver_match.url_name == 'calendar-view' %}active{% endif %}" href="{% url 'planning-hub' %}">Planning</a>
+                    <a class="{% if request.resolver_match.url_name == 'tasklog-create' %}active{% endif %}" href="{% url 'tasklog-create' %}">Log Work</a>
+                    <a class="{% if request.resolver_match.url_name == 'leave-request-list' or request.resolver_match.url_name == 'leave-request-create' %}active{% endif %}" href="{% url 'leave-request-list' %}">Leave</a>
+                    <a class="{% if request.resolver_match.url_name == 'performance-review-list' %}active{% endif %}" href="{% url 'performance-review-list' %}">Reviews</a>
+                    <a class="{% if request.resolver_match.url_name == 'analytics' %}active{% endif %}" href="{% url 'analytics' %}">AI Insights</a>
+                    <a class="{% if request.resolver_match.url_name == 'notification-list' %}active{% endif %}" href="{% url 'notification-list' %}">Notifications</a>
+                {% else %}
+                    <a class="{% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}">Dashboard</a>
+                {% endif %}
+            </nav>
+            <div class="sidebar-footer">
+                {% if user.is_authenticated %}
+                    <div class="user-chip">
+                        <strong>{{ user.username }}</strong>
+                        <p class="muted">Role: {{ current_role|default:"unassigned" }}</p>
+                    </div>
+                    <a class="button ghost full-width" href="{% url 'profile' %}">Profile</a>
+                    <a class="button ghost full-width" href="{% url 'password_change' %}">Change Password</a>
+                    <form method="post" action="{% url 'logout' %}">
+                        {% csrf_token %}
+                        <button class="button ghost full-width" type="submit">Logout</button>
+                    </form>
+                {% endif %}
+            </div>
+        </aside>
+        <main class="content">
+            <div class="content-shell">
+                <section class="topbar">
+                    <div class="topbar-copy">
+                        <h2>{{ current_role|default:"Workspace"|title }} Workspace</h2>
+                        <p class="muted">Role-based task management, planning, and AI-assisted oversight in one workspace.</p>
+                    </div>
+                    <div class="topbar-actions">
+                        <span class="pill primary">{{ user.username }}</span>
+                        <span class="pill">{{ current_role|default:"user"|title }}</span>
+                    </div>
+                </section>
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="flash">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+</body>
+</html>

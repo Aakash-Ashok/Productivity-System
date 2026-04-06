@@ -1,0 +1,26 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login | Productivity System</title>
+    <link rel="stylesheet" href="{% static 'core/styles.css' %}">
+</head>
+<body class="login-body">
+    <section class="login-card">
+        <p class="eyebrow">AI-Powered Task Management</p>
+        <h1>Sign in to continue</h1>
+        <p class="muted">Access your role-based workspace to manage teams, execute tasks, and review AI-assisted delivery signals.</p>
+        <form method="post" class="stack">
+            {% csrf_token %}
+            {{ form.as_p }}
+            <button class="button" type="submit">Sign In</button>
+        </form>
+        <div class="auth-links">
+            <span class="muted">Secure login for admin, manager, and employee roles.</span>
+            <a href="{% url 'password_reset' %}">Forgot password?</a>
+        </div>
+    </section>
+</body>
+</html>

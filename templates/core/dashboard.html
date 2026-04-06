@@ -1,0 +1,716 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard | Productivity System{% endblock %}
+
+{% block content %}
+{% if dashboard_role == 'admin' %}
+<section class="page-head">
+    <div>
+        <p class="eyebrow">Admin Control Center</p>
+        <h2>System Administration Dashboard</h2>
+        <p class="muted">Monitor platform health, team structure, project delivery, and system-wide AI signals from one executive view.</p>
+    </div>
+    <div class="actions">
+        <a class="button ghost" href="{% url 'user-create' %}">Create User</a>
+        <a class="button ghost" href="{% url 'team-create' %}">Create Team</a>
+        <a class="button ghost" href="{% url 'project-create' %}">Create Project</a>
+        <a class="button" href="{% url 'task-create' %}">Assign Task</a>
+        <a class="button ghost" href="{% url 'employee-create' %}">Add Employee</a>
+    </div>
+</section>
+
+<section class="split-layout">
+    <article class="hero-card">
+        <p class="eyebrow">Today At A Glance</p>
+        <h3>Stay ahead of delivery risk before it becomes a system problem</h3>
+        <p class="muted">Use this dashboard to monitor team health, approval bottlenecks, delayed work, and projects that need intervention first.</p>
+        <div class="hero-points">
+            <div><strong>{{ approval_queue|length }}</strong><br>tasks are waiting in approval workflow right now.</div>
+            <div><strong>{{ burnout_alerts|length }}</strong><br>employees are showing elevated workload or burnout signals.</div>
+            <div><strong>{{ anomaly_tasks|length }}</strong><br>tasks were flagged for unusual execution patterns.</div>
+        </div>
+    </article>
+    <article class="panel">
+        <h3>Admin Focus</h3>
+        <div class="metric-list">
+            <div class="metric-tile">
+                <span class="muted">Projects at risk</span>
+                <strong>{{ delayed_tasks }}</strong>
+            </div>
+            <div class="metric-tile">
+                <span class="muted">Pending reviews</span>
+                <strong>{{ approval_queue|length }}</strong>
+            </div>
+            <div class="metric-tile">
+                <span class="muted">Teams active</span>
+                <strong>{{ total_teams }}</strong>
+            </div>
+            <div class="metric-tile">
+                <span class="muted">Completion rate</span>
+                <strong>{{ completion_rate }}%</strong>
+            </div>
+        </div>
+    </article>
+</section>
+
+<section class="shortcut-grid">
+    <article class="shortcut-card">
+        <h3>People & Access</h3>
+        <p class="muted">Create accounts, configure roles, and keep the team structure accurate.</p>
+        <div class="actions">
+            <a class="button" href="{% url 'user-create' %}">Create User</a>
+            <a class="button ghost" href="{% url 'team-list' %}">Open Teams</a>
+        </div>
+    </article>
+    <article class="shortcut-card">
+        <h3>Delivery Oversight</h3>
+        <p class="muted">Jump straight into cross-team projects, tasks, and exception handling.</p>
+        <div class="actions">
+            <a class="button" href="{% url 'project-list' %}">View Projects</a>
+            <a class="button ghost" href="{% url 'task-list' %}">View Tasks</a>
+        </div>
+    </article>
+    <article class="shortcut-card">
+        <h3>AI Monitoring</h3>
+        <p class="muted">Review performance trends, workload imbalance, and predictive alerts.</p>
+        <div class="actions">
+            <a class="button" href="{% url 'analytics' %}">Open AI Insights</a>
+            <a class="button ghost" href="{% url 'audit-log-list' %}">Audit Logs</a>
+        </div>
+    </article>
+</section>
+
+<section class="stats-grid">
+    <article class="stat-card">
+        <span>Total Teams</span>
+        <strong>{{ total_teams }}</strong>
+        <small>Active delivery groups configured across the system.</small>
+    </article>
+    <article class="stat-card">
+        <span>Total Projects</span>
+        <strong>{{ total_projects }}</strong>
+        <small>Tracked initiatives currently managed in the workspace.</small>
+    </article>
+    <article class="stat-card">
+        <span>Total Employees</span>
+        <strong>{{ total_users }}</strong>
+        <small>All employee and manager-linked accounts under oversight.</small>
+    </article>
+    <article class="stat-card">
+        <span>Total Tasks</span>
+        <strong>{{ total_tasks }}</strong>
+        <small>Execution workload currently stored in the platform.</small>
+    </article>
+    <article class="stat-card">
+        <span>Completed Tasks</span>
+        <strong>{{ completed_tasks }}</strong>
+        <small>Tasks delivered and closed through the approval workflow.</small>
+    </article>
+    <article class="stat-card">
+        <span>Delayed Tasks</span>
+        <strong>{{ delayed_tasks }}</strong>
+        <small>Tasks already flagged as missed or high-risk deadlines.</small>
+    </article>
+    <article class="stat-card">
+        <span>Completion Rate</span>
+        <strong>{{ completion_rate }}%</strong>
+        <small>Overall delivery efficiency across all tracked teams.</small>
+    </article>
+</section>
+
+<section class="panel-grid">
+    <article class="panel wide">
+        <h3>Team Management Snapshot</h3>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Team</th>
+                    <th>Manager</th>
+                    <th>Employees</th>
+                    <th>Projects</th>
+                    <th>Active Tasks</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for team in team_summary %}
+                    <tr>
+                        <td>{{ team.team.name }}</td>
+                        <td>{{ team.team.manager.username|default:'Unassigned' }}</td>
+                        <td>{{ team.member_count }}</td>
+                        <td>{{ team.project_count }}</td>
+                        <td>{{ team.active_tasks }}</td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="5">No teams available yet.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </article>
+
+    <article class="panel">
+        <h3>Manager Approval Queue</h3>
+        <p class="panel-subtitle muted">Admin can monitor pending submissions and step in only when escalation is required.</p>
+        {% for task in approval_queue %}
+            <div class="list-row">
+                <div>
+                    <a href="{% url 'task-detail' task.pk %}">{{ task.title }}</a>
+                    <p class="muted">{{ task.project.name|default:'No project' }}</p>
+                </div>
+                <span class="badge warning">{{ task.get_approval_status_display }}</span>
+            </div>
+        {% empty %}
+            <p class="muted">No tasks are waiting for approval.</p>
+        {% endfor %}
+    </article>
+
+    <article class="panel wide">
+        <h3>Project Management Snapshot</h3>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Project</th>
+                    <th>Team</th>
+                    <th>Status</th>
+                    <th>Deadline</th>
+                    <th>Progress</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in project_summary %}
+                    <tr>
+                        <td>{{ item.project.name }}</td>
+                        <td>{{ item.project.team.name }}</td>
+                        <td>{{ item.project.status }}</td>
+                        <td>{{ item.project.deadline }}</td>
+                        <td>{{ item.progress }}%</td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="5">No projects created yet.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </article>
+
+    <article class="panel">
+        <h3>Upcoming Deadlines</h3>
+        {% for task in upcoming_deadlines %}
+            <div class="list-row">
+                <div>
+                    <a href="{% url 'task-detail' task.pk %}">{{ task.title }}</a>
+                    <p class="muted">{{ task.project.name|default:'No project' }} | {{ task.assigned_to|default:'Unassigned' }}</p>
+                </div>
+                <span>{{ task.deadline }}</span>
+            </div>
+        {% empty %}
+            <p class="muted">No active deadlines right now.</p>
+        {% endfor %}
+    </article>
+
+    <article class="panel">
+        <h3>Burnout Alerts</h3>
+        {% for metric in burnout_alerts %}
+            <div class="list-row">
+                <div>
+                    <strong>{{ metric.employee.name }}</strong>
+                    <p class="muted">{{ metric.active_tasks }} active tasks, {{ metric.average_daily_hours }} avg hours/day</p>
+                </div>
+                <span class="badge warning">{{ metric.burnout_risk }}</span>
+            </div>
+        {% empty %}
+            <p class="muted">No burnout risk detected.</p>
+        {% endfor %}
+    </article>
+
+    <article class="panel">
+        <h3>Top Performers</h3>
+        {% for metric in top_performers %}
+            <div class="list-row">
+                <div>
+                    <strong>{{ metric.employee.name }}</strong>
+                    <p class="muted">{{ metric.tasks_completed }} completed, {{ metric.avg_completion_time }} day avg</p>
+                </div>
+                <span>{{ metric.completion_rate }}%</span>
+            </div>
+        {% empty %}
+            <p class="muted">Add employees and tasks to generate rankings.</p>
+        {% endfor %}
+    </article>
+
+    <article class="panel">
+        <h3>Anomaly Detection</h3>
+        {% for task in anomaly_tasks %}
+            <div class="list-row">
+                <div>
+                    <a href="{% url 'task-detail' task.pk %}">{{ task.title }}</a>
+                    <p class="muted">Progress {{ task.progress }}%, estimate {{ task.estimated_hours }}h</p>
+                </div>
+                <span class="badge danger">Review</span>
+            </div>
+        {% empty %}
+            <p class="muted">No anomalous work patterns detected.</p>
+        {% endfor %}
+    </article>
+
+    <article class="panel wide">
+        <h3>Workload Distribution</h3>
+        <div class="chart-list">
+            {% for item in workload_chart %}
+                <div class="chart-row">
+                    <span>{{ item.name }}</span>
+                    <div class="bar-track"><div class="bar-fill" style="width:{% widthratio item.active_count 8 100 %}%"></div></div>
+                    <strong>{{ item.active_count }}</strong>
+                </div>
+            {% empty %}
+                <p class="muted">No employee workload data yet.</p>
+            {% endfor %}
+        </div>
+    </article>
+
+    <article class="panel wide">
+        <h3>Recent Work Logs</h3>
+        {% for log in recent_logs %}
+            <div class="list-row">
+                <div>
+                    <strong>{{ log.employee.name }}</strong>
+                    <p class="muted">{{ log.task.title }} on {{ log.log_date }} | {{ log.task.project.name|default:'No project' }}</p>
+                </div>
+                <span>{{ log.hours_spent }}h</span>
+            </div>
+        {% empty %}
+            <p class="muted">No work logs yet.</p>
+        {% endfor %}
+    </article>
+
+    <article class="panel">
+        <h3>Notifications</h3>
+        {% for item in notifications %}
+            <div class="list-row">
+                <div>
+                    <strong>{{ item.title }}</strong>
+                    <p class="muted">{{ item.message }}</p>
+                </div>
+            </div>
+        {% empty %}
+            <p class="muted">No new notifications.</p>
+        {% endfor %}
+    </article>
+</section>
+{% elif dashboard_role == 'manager' %}
+<section class="page-head">
+    <div>
+        <p class="eyebrow">Manager Workspace</p>
+        <h2>Team Delivery Dashboard</h2>
+        <p class="muted">Stay focused on your assigned projects, your team's workload, and the approvals or risks that need attention now.</p>
+    </div>
+    <div class="actions">
+        <a class="button ghost" href="{% url 'performance-review-create' %}">Add Review</a>
+        <a class="button" href="{% url 'task-create' %}">Assign Task</a>
+    </div>
+</section>
+
+<section class="split-layout">
+    <article class="hero-card">
+        <p class="eyebrow">Manager Pulse</p>
+        <h3>Lead your team with clear next steps</h3>
+        <p class="muted">This dashboard is tuned for fast decision-making: what is late, who is overloaded, and which submissions need your review.</p>
+        <div class="hero-points">
+            <div><strong>{{ pending_approvals|length }}</strong><br>tasks are waiting for your decision.</div>
+            <div><strong>{{ burnout_alerts|length }}</strong><br>team members need workload attention.</div>
+            <div><strong>{{ manager_risks|length }}</strong><br>tasks have medium or high delay risk signals.</div>
+        </div>
+    </article>
+    <article class="panel">
+        <h3>Manager Focus</h3>
+        <div class="metric-list">
+            <div class="metric-tile">
+                <span class="muted">My projects</span>
+                <strong>{{ managed_projects.count }}</strong>
+            </div>
+            <div class="metric-tile">
+                <span class="muted">Open approvals</span>
+                <strong>{{ pending_approvals|length }}</strong>
+            </div>
+            <div class="metric-tile">
+                <span class="muted">Team members</span>
+                <strong>{{ team_members.count }}</strong>
+            </div>
+            <div class="metric-tile">
+                <span class="muted">Risk alerts</span>
+                <strong>{{ manager_risks|length }}</strong>
+            </div>
+        </div>
+    </article>
+</section>
+
+<section class="shortcut-grid">
+    <article class="shortcut-card">
+        <h3>Assign & Track</h3>
+        <p class="muted">Create team tasks and follow project delivery without leaving your role scope.</p>
+        <div class="actions">
+            <a class="button" href="{% url 'task-create' %}">Create Task</a>
+            <a class="button ghost" href="{% url 'project-list' %}">My Projects</a>
+        </div>
+    </article>
+    <article class="shortcut-card">
+        <h3>Review Queue</h3>
+        <p class="muted">Approve submissions, review leave requests, and keep work moving.</p>
+        <div class="actions">
+            <a class="button" href="{% url 'approval-queue' %}">Open Queue</a>
+            <a class="button ghost" href="{% url 'leave-request-list' %}">Leave Requests</a>
+        </div>
+    </article>
+    <article class="shortcut-card">
+        <h3>Performance & AI</h3>
+        <p class="muted">Use insights to coach the team and prevent schedule slip early.</p>
+        <div class="actions">
+            <a class="button" href="{% url 'analytics' %}">AI Insights</a>
+            <a class="button ghost" href="{% url 'performance-review-list' %}">Reviews</a>
+        </div>
+    </article>
+</section>
+
+<section class="stats-grid">
+    <article class="stat-card">
+        <span>Managed Teams</span>
+        <strong>{{ managed_teams.count }}</strong>
+        <small>Teams currently reporting to your manager account.</small>
+    </article>
+    <article class="stat-card">
+        <span>Projects</span>
+        <strong>{{ managed_projects.count }}</strong>
+        <small>Projects that belong to your managed team structure.</small>
+    </article>
+    <article class="stat-card">
+        <span>Team Members</span>
+        <strong>{{ team_members.count }}</strong>
+        <small>Employees available to receive and execute delivery work.</small>
+    </article>
+    <article class="stat-card">
+        <span>Tracked Tasks</span>
+        <strong>{{ managed_tasks.count }}</strong>
+        <small>Tasks currently active or recently updated in your scope.</small>
+    </article>
+</section>
+
+<section class="panel-grid">
+    <article class="panel wide">
+        <h3>Your Teams</h3>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Team</th>
+                    <th>Manager</th>
+                    <th>Employees</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for team in managed_teams %}
+                    <tr>
+                        <td>{{ team.name }}</td>
+                        <td>{{ team.manager.username }}</td>
+                        <td>{{ team.employees.count }}</td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="3">No teams assigned to you yet.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </article>
+
+    <article class="panel wide">
+        <h3>Project Progress</h3>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Project</th>
+                    <th>Team</th>
+                    <th>Status</th>
+                    <th>Deadline</th>
+                    <th>Progress</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for project in managed_projects %}
+                    <tr>
+                        <td>{{ project.name }}</td>
+                        <td>{{ project.team.name }}</td>
+                        <td>{{ project.status }}</td>
+                        <td>{{ project.deadline }}</td>
+                        <td>{{ project.progress }}%</td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="5">No projects assigned yet.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </article>
+
+    <article class="panel">
+        <h3>AI Delay Alerts</h3>
+        {% for task, risk in manager_risks %}
+            <div class="list-row">
+                <div>
+                    <a href="{% url 'task-detail' task.pk %}">{{ task.title }}</a>
+                    <p class="muted">{{ task.project.name|default:'No project' }}</p>
+                </div>
+                <span class="badge warning">{{ risk.label }} {{ risk.probability }}%</span>
+            </div>
+        {% empty %}
+            <p class="muted">No AI delay alerts for your tasks.</p>
+        {% endfor %}
+    </article>
+
+    <article class="panel">
+        <h3>Burnout Warnings</h3>
+        {% for metric in burnout_alerts %}
+            <div class="list-row">
+                <div>
+                    <strong>{{ metric.employee.name }}</strong>
+                    <p class="muted">{{ metric.active_tasks }} active tasks</p>
+                </div>
+                <span class="badge danger">{{ metric.burnout_risk }}</span>
+            </div>
+        {% empty %}
+            <p class="muted">No team burnout warnings right now.</p>
+        {% endfor %}
+    </article>
+
+    <article class="panel">
+        <h3>Manager Approval Queue</h3>
+        <p class="panel-subtitle muted">Review employee submissions before they move to completed status.</p>
+        {% for task in pending_approvals %}
+            <div class="list-row">
+                <div>
+                    <a href="{% url 'task-detail' task.pk %}">{{ task.title }}</a>
+                    <p class="muted">{{ task.assigned_to|default:'Unassigned' }}</p>
+                </div>
+                <a class="button ghost" href="{% url 'task-approve' task.pk %}">Review</a>
+            </div>
+        {% empty %}
+            <p class="muted">No approvals waiting.</p>
+        {% endfor %}
+    </article>
+
+    <article class="panel wide">
+        <h3>Recent Tasks Under Your Teams</h3>
+        {% for task in managed_tasks %}
+            <div class="list-row">
+                <div>
+                    <a href="{% url 'task-detail' task.pk %}">{{ task.title }}</a>
+                    <p class="muted">{{ task.assigned_to|default:'Unassigned' }} | {{ task.project.name|default:'No project' }}</p>
+                </div>
+                <span>{{ task.progress }}%</span>
+            </div>
+        {% empty %}
+            <p class="muted">No tasks in your teams yet.</p>
+        {% endfor %}
+    </article>
+
+    <article class="panel wide">
+        <h3>Notifications & Alerts</h3>
+        {% for item in notifications %}
+            <div class="list-row">
+                <div>
+                    <strong>{{ item.title }}</strong>
+                    <p class="muted">{{ item.message }}</p>
+                </div>
+            </div>
+        {% empty %}
+            <p class="muted">No new alerts.</p>
+        {% endfor %}
+    </article>
+
+    <article class="panel">
+        <h3>Leave Requests</h3>
+        {% for item in team_leave_requests %}
+            <div class="list-row">
+                <div>
+                    <strong>{{ item.employee.name }}</strong>
+                    <p class="muted">{{ item.start_date }} to {{ item.end_date }}</p>
+                </div>
+                <span>{{ item.get_status_display }}</span>
+            </div>
+        {% empty %}
+            <p class="muted">No team leave requests.</p>
+        {% endfor %}
+    </article>
+</section>
+{% elif dashboard_role == 'employee' %}
+<section class="page-head">
+    <div>
+        <p class="eyebrow">Employee Workspace</p>
+        <h2>My Productivity Dashboard</h2>
+        <p class="muted">Track assigned work, log progress, and use your personal AI insights to stay ahead of risk and deadlines.</p>
+    </div>
+    <div class="actions">
+        <a class="button" href="{% url 'tasklog-create' %}">Log Work</a>
+    </div>
+</section>
+
+{% if employee_record %}
+<section class="split-layout">
+    <article class="hero-card">
+        <p class="eyebrow">Personal Workboard</p>
+        <h3>See what matters today without digging through menus</h3>
+        <p class="muted">Your dashboard surfaces assigned work, recent activity, and your personal AI signals so you can stay organized and on time.</p>
+        <div class="hero-points">
+            <div><strong>{{ my_pending_tasks }}</strong><br>tasks still need progress updates or completion.</div>
+            <div><strong>{{ my_logs|length }}</strong><br>recent work logs help you track where your time went.</div>
+            <div><strong>{{ my_ai_results|length }}</strong><br>AI insight cards are available for your current work.</div>
+        </div>
+    </article>
+    <article class="panel">
+        <h3>My Focus</h3>
+        <div class="metric-list">
+            <div class="metric-tile">
+                <span class="muted">Assigned</span>
+                <strong>{{ my_tasks.count }}</strong>
+            </div>
+            <div class="metric-tile">
+                <span class="muted">Completed</span>
+                <strong>{{ my_completed_tasks }}</strong>
+            </div>
+            <div class="metric-tile">
+                <span class="muted">Pending</span>
+                <strong>{{ my_pending_tasks }}</strong>
+            </div>
+            <div class="metric-tile">
+                <span class="muted">Burnout signal</span>
+                <strong>{{ my_metric.burnout_risk|default:'Low' }}</strong>
+            </div>
+        </div>
+    </article>
+</section>
+
+<section class="shortcut-grid">
+    <article class="shortcut-card">
+        <h3>My Work</h3>
+        <p class="muted">Open assigned tasks and keep your progress updated.</p>
+        <div class="actions">
+            <a class="button" href="{% url 'task-list' %}">My Tasks</a>
+            <a class="button ghost" href="{% url 'tasklog-create' %}">Log Work</a>
+        </div>
+    </article>
+    <article class="shortcut-card">
+        <h3>Personal Planning</h3>
+        <p class="muted">Use planning and leave tools without extra clicks.</p>
+        <div class="actions">
+            <a class="button" href="{% url 'planning-hub' %}">Planning</a>
+            <a class="button ghost" href="{% url 'leave-request-create' %}">Request Leave</a>
+        </div>
+    </article>
+    <article class="shortcut-card">
+        <h3>Growth & Feedback</h3>
+        <p class="muted">Review feedback and check your personal AI insights.</p>
+        <div class="actions">
+            <a class="button" href="{% url 'performance-review-list' %}">My Reviews</a>
+            <a class="button ghost" href="{% url 'analytics' %}">AI Insights</a>
+        </div>
+    </article>
+</section>
+
+<section class="stats-grid">
+    <article class="stat-card">
+        <span>Assigned Tasks</span>
+        <strong>{{ my_tasks.count }}</strong>
+        <small>All tasks currently assigned to your employee profile.</small>
+    </article>
+    <article class="stat-card">
+        <span>Completed Tasks</span>
+        <strong>{{ my_completed_tasks }}</strong>
+        <small>Tasks you have already delivered successfully.</small>
+    </article>
+    <article class="stat-card">
+        <span>Pending Tasks</span>
+        <strong>{{ my_pending_tasks }}</strong>
+        <small>Work still in progress or waiting for completion.</small>
+    </article>
+    <article class="stat-card">
+        <span>Burnout Risk</span>
+        <strong>{{ my_metric.burnout_risk|default:'Low' }}</strong>
+        <small>Personal workload signal based on hours, delays, and active task count.</small>
+    </article>
+</section>
+
+<section class="panel-grid">
+    <article class="panel wide">
+        <h3>My Tasks</h3>
+        {% for task in my_tasks %}
+            <div class="list-row">
+                <div>
+                    <a href="{% url 'task-detail' task.pk %}">{{ task.title }}</a>
+                    <p class="muted">{{ task.project.name|default:'No project' }} | Deadline {{ task.deadline }}</p>
+                </div>
+                <span>{{ task.progress }}%</span>
+            </div>
+        {% empty %}
+            <p class="muted">No tasks assigned to you yet.</p>
+        {% endfor %}
+    </article>
+
+    <article class="panel">
+        <h3>My AI Insights</h3>
+        {% for result in my_ai_results %}
+            <div class="suggestion-card">
+                <strong>{{ result.task.title }}</strong>
+                <p class="muted">Predicted time: {{ result.predicted_time }} hours</p>
+                <p class="muted">Delay risk: {{ result.delay_risk }}%</p>
+            </div>
+        {% empty %}
+            <p class="muted">AI insights will appear when you have assigned tasks.</p>
+        {% endfor %}
+    </article>
+
+    <article class="panel">
+        <h3>My Recent Logs</h3>
+        {% for log in my_logs %}
+            <div class="list-row">
+                <div>
+                    <strong>{{ log.task.title }}</strong>
+                    <p class="muted">{{ log.log_date }}</p>
+                </div>
+                <span>{{ log.hours_spent }}h</span>
+            </div>
+        {% empty %}
+            <p class="muted">No work logs yet.</p>
+        {% endfor %}
+    </article>
+
+    <article class="panel">
+        <h3>My Notifications</h3>
+        {% for item in notifications %}
+            <div class="list-row">
+                <div>
+                    <strong>{{ item.title }}</strong>
+                    <p class="muted">{{ item.message }}</p>
+                </div>
+            </div>
+        {% empty %}
+            <p class="muted">No notifications yet.</p>
+        {% endfor %}
+    </article>
+
+    <article class="panel">
+        <h3>Quick Actions</h3>
+        <div class="stack">
+            <a class="button" href="{% url 'leave-request-create' %}">Request Leave</a>
+            <a class="button ghost" href="{% url 'notification-list' %}">Open Notifications</a>
+            <a class="button ghost" href="{% url 'performance-review-list' %}">My Reviews</a>
+        </div>
+    </article>
+</section>
+{% else %}
+<section class="panel">
+    <p class="muted">Your account does not have an employee profile linked yet.</p>
+</section>
+{% endif %}
+{% endif %}
+{% endblock %}

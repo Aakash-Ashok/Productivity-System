@@ -1,0 +1,30 @@
+{% extends 'admin/adminbase.html' %}
+
+{% block title %}Kanban Board | Productivity System{% endblock %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <p class="eyebrow">Board View</p>
+        <h2>Kanban Board</h2>
+    </div>
+</section>
+
+<section class="kanban-grid">
+    {% for column in kanban_columns %}
+        <article class="panel">
+            <h3>{{ column.label }}</h3>
+            {% for task in column.tasks %}
+                <div class="suggestion-card">
+                    <a href="{% url 'task-detail' task.pk %}"><strong>{{ task.title }}</strong></a>
+                    <p class="muted">{{ task.project.name|default:'No project' }}</p>
+                    <p class="muted">{{ task.assigned_to|default:'Unassigned' }} | {{ task.progress }}%</p>
+                </div>
+            {% empty %}
+                <p class="muted">No tasks.</p>
+            {% endfor %}
+        </article>
+    {% endfor %}
+</section>
+{% endblock %}
+

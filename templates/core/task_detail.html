@@ -1,0 +1,219 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ task.title }} | Productivity System{% endblock %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <p class="eyebrow">Task Insight</p>
+        <h2>{{ task.title }}</h2>
+        <p class="muted">{{ task.description|default:"Review the task summary, progress, AI guidance, and collaboration history below." }}</p>
+    </div>
+    <div class="actions">
+        <a class="button" href="{% url 'task-update' task.pk %}">Update Task</a>
+        {% if can_log_task %}
+            <a class="button ghost" href="{% url 'tasklog-create' %}?task={{ task.pk }}">Log Work</a>
+        {% endif %}
+    </div>
+</section>
+
+<section class="stats-grid">
+    <article class="stat-card">
+        <span>Status</span>
+        <strong>{{ task.status }}</strong>
+        <small>Current execution state for this task.</small>
+    </article>
+    <article class="stat-card">
+        <span>Progress</span>
+        <strong>{{ task.progress }}%</strong>
+        <small>Latest completion percentage reported by the assignee.</small>
+    </article>
+    <article class="stat-card">
+        <span>Logged Hours</span>
+        <strong>{{ total_logged_hours }}</strong>
+        <small>Total work hours captured across all task log entries.</small>
+    </article>
+    <article class="stat-card">
+        <span>AI Time Prediction</span>
+        <strong>{{ predicted_completion_hours }}h</strong>
+        <small>Estimated effort generated from historical performance data.</small>
+    </article>
+</section>
+
+<section class="split-layout">
+    <article class="hero-card">
+        <p class="eyebrow">Delivery Snapshot</p>
+        <h3>Task overview without the noise</h3>
+        <p class="muted">Use this page to review ownership, delivery risk, AI recommendations, work logs, and approval state from one focused workspace.</p>
+        <div class="hero-points">
+            <div><strong>Assignment</strong><br>{{ task.assigned_to|default:'Unassigned' }} on {{ task.project.name|default:'No project' }}</div>
+            <div><strong>Deadline</strong><br>{{ task.deadline }} with {{ delay_risk.label|lower }} risk guidance</div>
+            <div><strong>Approval Flow</strong><br>{% if task.requires_approval %}Manager review required before completion.{% else %}Direct completion allowed for this task.{% endif %}</div>
+        </div>
+    </article>
+    <article class="panel">
+        <h3>Decision Support</h3>
+        <div class="metric-list">
+            <div class="metric-tile">
+                <span class="muted">Priority</span>
+                <strong>{{ task.priority }}</strong>
+            </div>
+            <div class="metric-tile">
+                <span class="muted">Difficulty</span>
+                <strong>{{ task.difficulty }}/5</strong>
+            </div>
+            <div class="metric-tile">
+                <span class="muted">Approval Status</span>
+                <strong>{{ task.get_approval_status_display }}</strong>
+            </div>
+            <div class="metric-tile">
+                <span class="muted">Workload Signal</span>
+                <strong>{{ ai_result.workload_signal|default:'Balanced' }}</strong>
+            </div>
+        </div>
+    </article>
+</section>
+
+<section class="panel-grid">
+    <article class="panel">
+        <h3>Task Summary</h3>
+        <div class="detail-grid">
+            <p><strong>Project:</strong> {{ task.project.name|default:'No project' }}</p>
+            <p><strong>Team:</strong> {{ task.project.team.name|default:'No team' }}</p>
+            <p><strong>Assigned to:</strong> {{ task.assigned_to|default:'Unassigned' }}</p>
+            <p><strong>Priority:</strong> {{ task.priority }}</p>
+            <p><strong>Deadline:</strong> {{ task.deadline }}</p>
+            <p><strong>Difficulty:</strong> {{ task.difficulty }}/5</p>
+            <p><strong>Approval needed:</strong> {% if task.requires_approval %}Yes{% else %}No{% endif %}</p>
+            <p><strong>Approval status:</strong> {{ task.get_approval_status_display }}</p>
+            <p><strong>Estimated hours:</strong> {{ task.estimated_hours }}</p>
+            <p><strong>Required skills:</strong> {{ task.required_skills|default:'Not specified' }}</p>
+        </div>
+    </article>
+
+    <article class="panel">
+        <h3>Stored AI Result</h3>
+        <p class="panel-subtitle muted">Generated from task history, employee performance, workload, and deadline proximity.</p>
+        <div class="detail-grid">
+            <p><strong>Predicted time:</strong> {{ ai_result.predicted_time }} hours</p>
+            <p><strong>Delay risk score:</strong> {{ ai_result.delay_risk }}%</p>
+            <p><strong>Suggestions:</strong> {{ ai_result.suggestions|default:'No suggestion yet' }}</p>
+            <p><strong>Recommended action:</strong> {{ ai_result.recommended_action|default:'Keep monitoring' }}</p>
+            <p><strong>Workload signal:</strong> {{ ai_result.workload_signal|default:'Balanced' }}</p>
+        </div>
+    </article>
+
+    {% if can_approve_task %}
+        <article class="panel">
+            <h3>Manager Approval</h3>
+            <p class="muted">This task was submitted and is waiting for manager review.</p>
+            <a class="button" href="{% url 'task-approve' task.pk %}">Approve or Request Rework</a>
+        </article>
+    {% endif %}
+
+    {% if is_admin_role %}
+        <article class="panel">
+            <h3>Admin Actions</h3>
+            <div class="stack">
+                <a class="button ghost" href="{% url 'task-update' task.pk %}">Edit Task</a>
+                <a class="button ghost" href="{% url 'task-approve' task.pk %}">Approval Decision</a>
+            </div>
+            <p class="muted">Use admin actions for intervention, correction, reassignment, deadline changes, and final approval decisions.</p>
+        </article>
+    {% endif %}
+
+    <article class="panel">
+        <h3>Delay Risk Prediction</h3>
+        <p class="risk">{{ delay_risk.label }} risk</p>
+        <p class="muted">Probability of delay: {{ delay_risk.probability }}%</p>
+    </article>
+
+    <article class="panel">
+        <h3>Skill Gap Analysis</h3>
+        <div class="detail-grid">
+            <p><strong>Matched Skills:</strong> {% if matched_skills %}{{ matched_skills|join:', ' }}{% else %}None identified{% endif %}</p>
+            <p><strong>Missing Skills:</strong> {% if missing_skills %}{{ missing_skills|join:', ' }}{% else %}No skill gap{% endif %}</p>
+            <p><strong>Recommended Training:</strong> {% if learning_recommendations %}{{ learning_recommendations|join:', ' }}{% else %}No training suggestion needed{% endif %}</p>
+        </div>
+    </article>
+
+    {% if not task.assigned_to %}
+        <article class="panel wide">
+            <h3>Smart Allocation Suggestions</h3>
+            {% for suggestion in allocation_suggestions %}
+                <div class="suggestion-card">
+                    <div class="list-row">
+                        <strong>{{ suggestion.employee.name }}</strong>
+                        <span>{{ suggestion.score }}%</span>
+                    </div>
+                    <p class="muted">{{ suggestion.employee.job_title }} | {{ suggestion.employee.skills }}</p>
+                    <p class="muted">{{ suggestion.reasons|join:', ' }}</p>
+                </div>
+            {% empty %}
+                <p class="muted">Add employees to enable assignment suggestions.</p>
+            {% endfor %}
+        </article>
+    {% endif %}
+
+    <article class="panel wide">
+        <h3>Work Logs</h3>
+        {% for log in task.logs.all %}
+            <div class="list-row">
+                <div>
+                    <strong>{{ log.employee.name }}</strong>
+                    <p class="muted">{{ log.log_date }} | Progress after log: {{ log.progress_after_log }}%</p>
+                </div>
+                <span>{{ log.hours_spent }}h</span>
+            </div>
+            {% if log.notes %}
+                <p class="muted note">{{ log.notes }}</p>
+            {% endif %}
+        {% empty %}
+            <p class="muted">No logs recorded for this task yet.</p>
+        {% endfor %}
+    </article>
+
+    <article class="panel">
+        <h3>Comments</h3>
+        <form method="post" action="{% url 'task-comment-create' task.pk %}" class="stack">
+            {% csrf_token %}
+            {{ comment_form.as_p }}
+            <button class="button" type="submit">Post Comment</button>
+        </form>
+        {% for comment in comments %}
+            <div class="suggestion-card">
+                <div class="list-row">
+                    <strong>{{ comment.author.username|default:'Unknown' }}</strong>
+                    <span>{{ comment.created_at|date:"Y-m-d H:i" }}</span>
+                </div>
+                <p>{{ comment.body }}</p>
+            </div>
+        {% empty %}
+            <p class="muted">No comments yet.</p>
+        {% endfor %}
+    </article>
+
+    <article class="panel">
+        <h3>Attachments</h3>
+        <form method="post" enctype="multipart/form-data" action="{% url 'task-attachment-create' task.pk %}" class="stack">
+            {% csrf_token %}
+            {{ attachment_form.as_p }}
+            <button class="button" type="submit">Upload File</button>
+        </form>
+        {% for attachment in attachments %}
+            <div class="list-row">
+                <div>
+                    <strong>{{ attachment.label }}</strong>
+                    <p class="muted">Uploaded by {{ attachment.uploaded_by.username|default:'Unknown' }}</p>
+                </div>
+                <div class="actions">
+                    <span>{{ attachment.uploaded_at|date:"Y-m-d" }}</span>
+                    <a class="button subtle" href="{{ attachment.file.url }}">Open</a>
+                </div>
+            </div>
+        {% empty %}
+            <p class="muted">No attachments yet.</p>
+        {% endfor %}
+    </article>
+</section>
+{% endblock %}

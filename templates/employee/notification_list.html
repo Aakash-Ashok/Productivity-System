@@ -1,0 +1,44 @@
+{% extends 'employee/employeebase.html' %}
+
+{% block title %}Notifications | Productivity System{% endblock %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <p class="eyebrow">Alerts & Updates</p>
+        <h2>Notifications</h2>
+        <p class="muted">Stay on top of assignments, approvals, reminders, and system-generated updates relevant to your role.</p>
+    </div>
+</section>
+
+<section class="stats-grid">
+    <article class="stat-card">
+        <span>Total Notifications</span>
+        <strong>{{ notifications|length }}</strong>
+        <small>Recent alerts currently visible in your workspace.</small>
+    </article>
+    <article class="stat-card">
+        <span>Inbox State</span>
+        <strong>{% if notifications %}Active{% else %}Clear{% endif %}</strong>
+        <small>Review new items here before taking action elsewhere.</small>
+    </article>
+</section>
+
+<section class="panel">
+    <h3>Notification Feed</h3>
+    <p class="panel-subtitle muted">Each notification gives you a quick explanation of what changed and when it was generated.</p>
+    {% for item in notifications %}
+        <div class="suggestion-card">
+            <div class="list-row">
+                <strong>{{ item.title }}</strong>
+                <span>{{ item.created_at|date:"Y-m-d H:i" }}</span>
+            </div>
+            <p class="muted">{{ item.get_kind_display }}</p>
+            <p>{{ item.message }}</p>
+        </div>
+    {% empty %}
+        <p class="muted">No notifications available.</p>
+    {% endfor %}
+</section>
+{% endblock %}
+

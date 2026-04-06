@@ -1,0 +1,45 @@
+{% extends 'manager/managebase.html' %}
+
+{% block title %}Recurring Tasks | Productivity System{% endblock %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <p class="eyebrow">Routine Work</p>
+        <h2>Recurring Tasks</h2>
+    </div>
+    {% if can_manage_delivery %}
+        <a class="button" href="{% url 'recurring-task-create' %}">Create Recurring Task</a>
+    {% endif %}
+</section>
+
+<section class="panel">
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Title</th>
+                <th>Project</th>
+                <th>Assignee</th>
+                <th>Frequency</th>
+                <th>Next Due</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in recurring_tasks %}
+                <tr>
+                    <td>{{ item.title }}</td>
+                    <td>{{ item.project.name }}</td>
+                    <td>{{ item.assigned_to|default:'Unassigned' }}</td>
+                    <td>{{ item.frequency }}</td>
+                    <td>{{ item.next_due_date }}</td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="5">No recurring tasks configured yet.</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endblock %}
+

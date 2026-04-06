@@ -1,0 +1,115 @@
+{% extends 'base.html' %}
+
+{% block title %}Planning | Productivity System{% endblock %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <p class="eyebrow">Planning Workspace</p>
+        <h2>Planning</h2>
+        <p class="muted">Milestones, recurring work, board planning, and deadline visibility in one place.</p>
+    </div>
+    <div class="actions">
+        <a class="button ghost" href="{% url 'milestone-list' %}">Milestones</a>
+        <a class="button ghost" href="{% url 'recurring-task-list' %}">Recurring Tasks</a>
+        <a class="button ghost" href="{% url 'kanban-board' %}">Kanban</a>
+        <a class="button" href="{% url 'calendar-view' %}">Calendar</a>
+    </div>
+</section>
+
+<section class="split-layout">
+    <article class="hero-card">
+        <p class="eyebrow">Planning Overview</p>
+        <h3>Organize work before it turns into delivery risk</h3>
+        <p class="muted">Use planning tools to track milestone dates, recurring work, and the next set of deadlines that need attention.</p>
+        <div class="hero-points">
+            <div><strong>{{ planning_projects|length }}</strong><br>projects are currently available in your planning scope.</div>
+            <div><strong>{{ planning_milestones|length }}</strong><br>upcoming milestones are visible for coordination.</div>
+            <div><strong>{{ planning_calendar_items|length }}</strong><br>deadline items are listed in the planning timeline.</div>
+        </div>
+    </article>
+    <article class="panel">
+        <h3>Planning Focus</h3>
+        <div class="metric-list">
+            <div class="metric-tile">
+                <span class="muted">Projects</span>
+                <strong>{{ planning_projects|length }}</strong>
+            </div>
+            <div class="metric-tile">
+                <span class="muted">Milestones</span>
+                <strong>{{ planning_milestones|length }}</strong>
+            </div>
+            <div class="metric-tile">
+                <span class="muted">Recurring</span>
+                <strong>{{ planning_recurring_tasks|length }}</strong>
+            </div>
+            <div class="metric-tile">
+                <span class="muted">Timeline items</span>
+                <strong>{{ planning_calendar_items|length }}</strong>
+            </div>
+        </div>
+    </article>
+</section>
+
+<section class="panel-grid">
+    <article class="panel">
+        <h3>Projects in Scope</h3>
+        {% for project in planning_projects %}
+            <div class="list-row">
+                <div>
+                    <strong>{{ project.name }}</strong>
+                    <p class="muted">{{ project.team.name }} | {{ project.status }}</p>
+                </div>
+                <span>{{ project.deadline }}</span>
+            </div>
+        {% empty %}
+            <p class="muted">No projects available.</p>
+        {% endfor %}
+    </article>
+
+    <article class="panel">
+        <h3>Upcoming Milestones</h3>
+        {% for milestone in planning_milestones %}
+            <div class="list-row">
+                <div>
+                    <strong>{{ milestone.name }}</strong>
+                    <p class="muted">{{ milestone.project.name }}</p>
+                </div>
+                <span>{{ milestone.deadline }}</span>
+            </div>
+        {% empty %}
+            <p class="muted">No milestones planned yet.</p>
+        {% endfor %}
+    </article>
+
+    <article class="panel">
+        <h3>Recurring Work</h3>
+        {% for item in planning_recurring_tasks %}
+            <div class="list-row">
+                <div>
+                    <strong>{{ item.title }}</strong>
+                    <p class="muted">{{ item.frequency }} | {{ item.assigned_to|default:'Unassigned' }}</p>
+                </div>
+                <span>{{ item.next_due_date }}</span>
+            </div>
+        {% empty %}
+            <p class="muted">No recurring tasks configured.</p>
+        {% endfor %}
+    </article>
+
+    <article class="panel wide">
+        <h3>Deadline Timeline</h3>
+        {% for item in planning_calendar_items %}
+            <div class="list-row">
+                <div>
+                    <a href="{% url 'task-detail' item.pk %}">{{ item.title }}</a>
+                    <p class="muted">{{ item.project.name|default:'No project' }} | {{ item.assigned_to|default:'Unassigned' }}</p>
+                </div>
+                <span>{{ item.deadline }}</span>
+            </div>
+        {% empty %}
+            <p class="muted">No upcoming deadlines.</p>
+        {% endfor %}
+    </article>
+</section>
+{% endblock %}

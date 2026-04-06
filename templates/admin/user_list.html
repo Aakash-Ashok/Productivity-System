@@ -1,0 +1,71 @@
+{% extends 'admin/adminbase.html' %}
+
+{% block title %}Users & Roles | Productivity System{% endblock %}
+
+{% block content %}
+<section class="page-head">
+    <div>
+        <p class="eyebrow">Access Control</p>
+        <h2>Users & Roles</h2>
+        <p class="muted">Manage access, monitor activation status, and keep admin, manager, and employee accounts organized.</p>
+    </div>
+    <a class="button" href="{% url 'user-create' %}">Create User</a>
+</section>
+
+<section class="stats-grid">
+    <article class="stat-card">
+        <span>Total Accounts</span>
+        <strong>{{ user_rows|length }}</strong>
+        <small>All workspace users with role-based access.</small>
+    </article>
+    <article class="stat-card">
+        <span>Admin Controls</span>
+        <strong>Enabled</strong>
+        <small>Create, edit, activate, and deactivate accounts from one place.</small>
+    </article>
+</section>
+
+<section class="panel">
+    <h3>User Directory</h3>
+    <p class="panel-subtitle muted">Review account status and use admin actions only when access or role data needs intervention.</p>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Username</th>
+                <th>Email</th>
+                <th>Role</th>
+                <th>Staff Access</th>
+                <th>Status</th>
+                <th>Admin Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for account in user_rows %}
+                <tr>
+                    <td>{{ account.username }}</td>
+                    <td>{{ account.email }}</td>
+                    <td>{{ account.role }}</td>
+                    <td>{% if account.is_staff %}Yes{% else %}No{% endif %}</td>
+                    <td>{% if account.is_active %}Active{% else %}Inactive{% endif %}</td>
+                    <td>
+                        <div class="admin-actions">
+                            <a class="button ghost" href="{% url 'user-update' account.id %}">Edit User</a>
+                            <form method="post" action="{% url 'user-toggle-active' account.id %}">
+                                {% csrf_token %}
+                                <button class="button ghost" type="submit">
+                                    {% if account.is_active %}Deactivate{% else %}Activate{% endif %}
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="6">No user accounts available yet.</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endblock %}
+
