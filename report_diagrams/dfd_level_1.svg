@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1200" viewBox="0 0 1800 1200">
+  <style>
+    .title { font: 700 30px Arial, sans-serif; fill: #000000; }
+    .proc { fill: #ffffff; stroke: #000000; stroke-width: 2.5; }
+    .store { fill: #ffffff; stroke: #000000; stroke-width: 2; }
+    .entity { fill: #ffffff; stroke: #000000; stroke-width: 2; }
+    .text { font: 700 16px Arial, sans-serif; fill: #000000; }
+    .small { font: 13px Arial, sans-serif; fill: #000000; }
+    .arrow { stroke: #000000; stroke-width: 2; marker-end: url(#arrow); fill: none; }
+  </style>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#000000"/>
+    </marker>
+  </defs>
+  <text x="900" y="50" text-anchor="middle" class="title">DFD Level 1 - AI Powered Employee Productivity and Task Management System</text>
+
+  <rect x="40" y="120" width="170" height="90" rx="12" class="entity"/><text x="125" y="172" text-anchor="middle" class="text">Admin</text>
+  <rect x="40" y="430" width="170" height="90" rx="12" class="entity"/><text x="125" y="482" text-anchor="middle" class="text">Manager</text>
+  <rect x="40" y="760" width="170" height="90" rx="12" class="entity"/><text x="125" y="812" text-anchor="middle" class="text">Employee</text>
+
+  <rect x="300" y="90" width="260" height="110" rx="16" class="proc"/><text x="430" y="135" text-anchor="middle" class="text">1. User and Role</text><text x="430" y="160" text-anchor="middle" class="text">Management</text>
+  <rect x="300" y="250" width="260" height="110" rx="16" class="proc"/><text x="430" y="295" text-anchor="middle" class="text">2. Team and Employee</text><text x="430" y="320" text-anchor="middle" class="text">Management</text>
+  <rect x="300" y="410" width="260" height="110" rx="16" class="proc"/><text x="430" y="455" text-anchor="middle" class="text">3. Project</text><text x="430" y="480" text-anchor="middle" class="text">Management</text>
+  <rect x="300" y="570" width="260" height="110" rx="16" class="proc"/><text x="430" y="615" text-anchor="middle" class="text">4. Task</text><text x="430" y="640" text-anchor="middle" class="text">Management</text>
+  <rect x="300" y="730" width="260" height="110" rx="16" class="proc"/><text x="430" y="775" text-anchor="middle" class="text">5. Task Logging and</text><text x="430" y="800" text-anchor="middle" class="text">Progress Update</text>
+  <rect x="300" y="890" width="260" height="110" rx="16" class="proc"/><text x="430" y="935" text-anchor="middle" class="text">6. AI Prediction and</text><text x="430" y="960" text-anchor="middle" class="text">Analysis</text>
+
+  <rect x="690" y="100" width="180" height="70" class="store"/><text x="780" y="143" text-anchor="middle" class="text">D1 User</text>
+  <rect x="690" y="210" width="180" height="70" class="store"/><text x="780" y="253" text-anchor="middle" class="text">D2 Team</text>
+  <rect x="690" y="320" width="180" height="70" class="store"/><text x="780" y="363" text-anchor="middle" class="text">D3 Employee</text>
+  <rect x="690" y="430" width="180" height="70" class="store"/><text x="780" y="473" text-anchor="middle" class="text">D4 Project</text>
+  <rect x="690" y="540" width="180" height="70" class="store"/><text x="780" y="583" text-anchor="middle" class="text">D5 Task</text>
+  <rect x="690" y="650" width="180" height="70" class="store"/><text x="780" y="693" text-anchor="middle" class="text">D6 TaskLog</text>
+  <rect x="690" y="760" width="180" height="70" class="store"/><text x="780" y="803" text-anchor="middle" class="text">D7 AIResult</text>
+  <rect x="690" y="870" width="180" height="70" class="store"/><text x="780" y="913" text-anchor="middle" class="text">D8 Request</text>
+  <rect x="690" y="980" width="180" height="70" class="store"/><text x="780" y="1023" text-anchor="middle" class="text">D9 Activity</text>
+  <rect x="690" y="1090" width="180" height="70" class="store"/><text x="780" y="1133" text-anchor="middle" class="text">D10 Attachment</text>
+
+  <rect x="1010" y="250" width="270" height="120" rx="16" class="proc"/><text x="1145" y="300" text-anchor="middle" class="text">7. Request</text><text x="1145" y="325" text-anchor="middle" class="text">Management</text>
+  <rect x="1010" y="470" width="270" height="120" rx="16" class="proc"/><text x="1145" y="520" text-anchor="middle" class="text">8. Activity and</text><text x="1145" y="545" text-anchor="middle" class="text">Notification Management</text>
+  <rect x="1010" y="690" width="270" height="120" rx="16" class="proc"/><text x="1145" y="740" text-anchor="middle" class="text">9. Report and</text><text x="1145" y="765" text-anchor="middle" class="text">Dashboard Generation</text>
+
+  <line x1="210" y1="165" x2="300" y2="145" class="arrow"/>
+  <line x1="210" y1="165" x2="300" y2="300" class="arrow"/>
+  <line x1="210" y1="475" x2="300" y2="620" class="arrow"/>
+  <line x1="210" y1="475" x2="300" y2="465" class="arrow"/>
+  <line x1="210" y1="805" x2="300" y2="785" class="arrow"/>
+  <line x1="210" y1="805" x2="1010" y2="305" class="arrow"/>
+
+  <line x1="560" y1="145" x2="690" y2="135" class="arrow"/>
+  <line x1="560" y1="300" x2="690" y2="245" class="arrow"/>
+  <line x1="560" y1="300" x2="690" y2="355" class="arrow"/>
+  <line x1="560" y1="465" x2="690" y2="465" class="arrow"/>
+  <line x1="560" y1="625" x2="690" y2="575" class="arrow"/>
+  <line x1="560" y1="785" x2="690" y2="685" class="arrow"/>
+  <line x1="560" y1="945" x2="690" y2="795" class="arrow"/>
+
+  <line x1="870" y1="355" x2="1010" y2="305" class="arrow"/>
+  <line x1="870" y1="575" x2="1010" y2="530" class="arrow"/>
+  <line x1="870" y1="685" x2="1010" y2="745" class="arrow"/>
+  <line x1="870" y1="795" x2="1010" y2="745" class="arrow"/>
+  <line x1="870" y1="905" x2="1010" y2="305" class="arrow"/>
+  <line x1="870" y1="1015" x2="1010" y2="530" class="arrow"/>
+
+  <line x1="1280" y1="305" x2="690" y2="905" class="arrow"/>
+  <line x1="1280" y1="530" x2="690" y2="1015" class="arrow"/>
+  <line x1="1280" y1="745" x2="1540" y2="745" class="arrow"/>
+  <rect x="1360" y="680" width="280" height="130" rx="16" class="entity"/>
+  <text x="1500" y="735" text-anchor="middle" class="text">Admin / Manager / Employee</text>
+  <text x="1500" y="765" text-anchor="middle" class="small">dashboards, reports, alerts</text>
+</svg>

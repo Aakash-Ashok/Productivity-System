@@ -2,339 +2,398 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{% block title %}Admin Panel{% endblock %}</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Admin | Productivity System{% endblock %}</title>
 
-<style>
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-    font-family: 'Segoe UI', sans-serif;
-}
+    <link rel="stylesheet"
+          href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
-/* ===== DARK MODE ===== */
-:root {
-    --bg: #0f172a;
-    --sidebar: #020617;
-    --card: #111827;
-    --border: #1f2937;
-    --text: #e5e7eb;
-    --muted: #9ca3af;
-    --accent: #3b82f6;
-}
+    <style>
+        :root{
+            --primary:#6366f1;
+            --primary-dark:#4f46e5;
+            --bg:#f8fafc;
+            --card:#ffffff;
+            --text:#1e293b;
+            --muted:#64748b;
+            --border:#e2e8f0;
+        }
 
-/* ===== LIGHT MODE ===== */
-.light-mode {
-    --bg: linear-gradient(135deg, #eef2ff, #f8fafc);
-    --sidebar: rgba(255,255,255,0.85);
-    --card: rgba(255,255,255,0.75);
-    --text: #111827;
-    --muted: #6b7280;
-    --border: rgba(0,0,0,0.06);
-    --accent: #4f46e5;
-}
+        *{
+            margin:0;
+            padding:0;
+            box-sizing:border-box;
+            font-family:'Segoe UI',sans-serif;
+        }
 
-/* ===== BODY ===== */
-body {
-    background: var(--bg);
-    color: var(--text);
-}
+        body{
+            background:var(--bg);
+            min-height:100vh;
+        }
 
-/* ===== LAYOUT ===== */
-.app-container {
-    display: flex;
-    height: 100vh;
-}
+        .dashboard-wrapper{
+            display:flex;
+            min-height:100vh;
+        }
 
-/* ===== SIDEBAR ===== */
-.sidebar {
-    width: 240px;
-    background: var(--sidebar);
-    border-right: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-    transition: 0.3s;
-}
+        /* Sidebar */
+        .sidebar{
+            width:280px;
+            background:#0f172a;
+            color:white;
+            display:flex;
+            flex-direction:column;
+            padding:24px;
+            position:fixed;
+            height:100vh;
+            overflow-y:auto;
+        }
 
-.sidebar.collapsed {
-    width: 70px;
-}
+        .brand{
+            display:flex;
+            align-items:center;
+            gap:12px;
+            margin-bottom:25px;
+        }
 
-/* ===== SIDEBAR HEADER ===== */
-.sidebar-header {
-    padding: 15px;
-    border-bottom: 1px solid var(--border);
-}
+        .brand-icon{
+            width:50px;
+            height:50px;
+            border-radius:12px;
+            background:linear-gradient(135deg,#6366f1,#8b5cf6);
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            font-size:20px;
+        }
 
-.sidebar-header .eyebrow {
-    font-size: 11px;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 1px;
-}
+        .brand h2{
+            font-size:20px;
+        }
 
-.sidebar-header h1 {
-    font-size: 18px;
-    margin-top: 5px;
-}
+        .brand span{
+            color:#94a3b8;
+            font-size:13px;
+        }
 
-/* ===== TOGGLE ===== */
-.sidebar-toggle {
-    padding: 10px;
-    cursor: pointer;
-}
+        .user-card{
+            display:flex;
+            align-items:center;
+            gap:12px;
+            background:rgba(255,255,255,.05);
+            padding:14px;
+            border-radius:15px;
+            margin-bottom:25px;
+        }
 
-/* ===== NAV ===== */
-.nav {
-    padding: 10px;
-}
+        .avatar{
+            width:48px;
+            height:48px;
+            border-radius:50%;
+            background:var(--primary);
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            font-weight:bold;
+            font-size:18px;
+        }
 
-.nav a {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 10px;
-    border-radius: 8px;
-    text-decoration: none;
-    color: var(--text);
-    transition: 0.2s;
-}
+        .user-card h4{
+            font-size:15px;
+        }
 
-.nav a:hover {
-    background: var(--card);
-}
+        .user-card p{
+            color:#94a3b8;
+            font-size:12px;
+        }
 
-.nav a.active {
-    background: var(--card);
-    color: var(--accent);
-}
+        .menu{
+            display:flex;
+            flex-direction:column;
+            gap:8px;
+        }
 
-/* ===== COLLAPSE ===== */
-.sidebar.collapsed span,
-.sidebar.collapsed .sidebar-header {
-    display: none;
-}
+        .menu a{
+            text-decoration:none;
+            color:#cbd5e1;
+            padding:13px 15px;
+            border-radius:12px;
+            transition:.3s;
+            display:flex;
+            align-items:center;
+            gap:10px;
+        }
 
-/* ===== FOOTER ===== */
-.sidebar-footer {
-    margin-top: auto;
-    padding: 15px;
-}
+        .menu a:hover,
+        .menu a.active{
+            background:var(--primary);
+            color:white;
+        }
 
-.user-chip {
-    padding: 10px;
-    border-radius: 8px;
-    background: var(--card);
-    margin-bottom: 10px;
-}
+        .sidebar-bottom{
+            margin-top:auto;
+        }
 
-.user-chip strong {
-    display: block;
-}
+        .sidebar-btn,
+        .logout-btn{
+            width:100%;
+            margin-top:10px;
+            background:#1e293b;
+            border:none;
+            color:white;
+            padding:12px;
+            border-radius:12px;
+            cursor:pointer;
+            text-decoration:none;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            gap:8px;
+            transition:.3s;
+        }
 
-.user-chip .muted {
-    font-size: 12px;
-    color: var(--muted);
-}
+        .sidebar-btn:hover,
+        .logout-btn:hover{
+            background:#334155;
+        }
 
-.side-btn {
-    display: block;
-    width: 100%;
-    padding: 8px;
-    margin-top: 6px;
-    border-radius: 6px;
-    text-decoration: none;
-    color: var(--text);
-    background: transparent;
-    border: 1px solid var(--border);
-    text-align: left;
-    cursor: pointer;
-}
+        /* Main Content */
+        .main-content{
+            margin-left:280px;
+            flex:1;
+            padding:25px;
+        }
 
-.side-btn:hover {
-    background: var(--card);
-}
+        .topbar{
+            background:white;
+            padding:22px 25px;
+            border-radius:18px;
+            display:flex;
+            justify-content:space-between;
+            align-items:center;
+            margin-bottom:20px;
+            box-shadow:0 5px 20px rgba(0,0,0,.05);
+        }
 
-.logout-btn {
-    color: #ef4444;
-    border-color: rgba(239,68,68,0.3);
-}
+        .topbar h1{
+            font-size:24px;
+            color:var(--text);
+        }
 
-.logout-btn:hover {
-    background: rgba(239,68,68,0.1);
-}
+        .topbar p{
+            color:var(--muted);
+            margin-top:4px;
+        }
 
-/* ===== MAIN ===== */
-.main-content {
-    flex: 1;
-    padding: 25px;
-    overflow-y: auto;
-}
+        .top-actions{
+            display:flex;
+            align-items:center;
+            gap:10px;
+        }
 
-/* ===== TOPBAR ===== */
-.topbar {
-    display: flex;
-    justify-content: flex-end;
-    margin-bottom: 20px;
-    padding-bottom: 10px;
-    border-bottom: 1px solid var(--border);
-}
+        .icon-btn{
+            width:42px;
+            height:42px;
+            border:none;
+            border-radius:12px;
+            background:#f1f5f9;
+            cursor:pointer;
+        }
 
-/* ===== USER ===== */
-.user-badge {
-    background: var(--card);
-    padding: 6px 12px;
-    border-radius: 20px;
-}
+        .profile-pill{
+            background:var(--primary);
+            color:white;
+            padding:10px 16px;
+            border-radius:999px;
+            font-weight:600;
+        }
 
-/* ===== BUTTON ===== */
-.toggle-btn {
-    background: var(--card);
-    border: 1px solid var(--border);
-    padding: 6px 10px;
-    border-radius: 8px;
-    cursor: pointer;
-    color: var(--text);
-}
+        .alert{
+            background:#dcfce7;
+            color:#166534;
+            padding:15px;
+            border-radius:12px;
+            margin-bottom:20px;
+        }
 
-/* ===== MESSAGE ===== */
-.message {
-    background: #22c55e20;
-    padding: 10px;
-    border-radius: 6px;
-    margin-bottom: 10px;
-}
+        .page-content{
+            background:white;
+            padding:25px;
+            border-radius:18px;
+            box-shadow:0 5px 20px rgba(0,0,0,.05);
+            min-height:500px;
+        }
 
-/* ===== GLASS LIGHT ===== */
-.light-mode .sidebar,
-.light-mode .card {
-    backdrop-filter: blur(10px);
-}
+        @media(max-width:768px){
 
-/* ===== COLLAPSE HIDE ===== */
-.sidebar.collapsed .user-chip,
-.sidebar.collapsed .side-btn {
-    display: none;
-}
+            .sidebar{
+                width:100%;
+                position:relative;
+                height:auto;
+            }
 
-/* ===== SCROLL ===== */
-::-webkit-scrollbar {
-    width: 6px;
-}
-::-webkit-scrollbar-thumb {
-    background: #374151;
-}
-</style>
+            .main-content{
+                margin-left:0;
+            }
+
+            .dashboard-wrapper{
+                flex-direction:column;
+            }
+
+            .topbar{
+                flex-direction:column;
+                gap:15px;
+                text-align:center;
+            }
+        }
+    </style>
+
 </head>
 
-<body id="body">
+<body>
 
-<div class="app-container">
+<div class="dashboard-wrapper">
 
-    <!-- SIDEBAR -->
-    <aside class="sidebar" id="sidebar">
+    <aside class="sidebar">
 
-        <div>
-
-            <!-- HEADER -->
-            <div class="sidebar-header">
-                <p class="eyebrow">Admin Workspace</p>
-                <h1>Productivity System</h1>
+        <div class="brand">
+            <div class="brand-icon">
+                <i class="fa-solid fa-layer-group"></i>
             </div>
-
-            <div class="sidebar-toggle" onclick="toggleSidebar()">☰</div>
-
-            <nav class="nav">
-                <a href="{% url 'dashboard' %}">🏠 <span>Dashboard</span></a>
-                <a href="{% url 'user-list' %}">👤 <span>Users</span></a>
-                <a href="{% url 'team-list' %}">👥 <span>Teams</span></a>
-                <a href="{% url 'employee-list' %}">🧑‍💼 <span>Employees</span></a>
-                <a href="{% url 'project-list' %}">📁 <span>Projects</span></a>
-                <a href="{% url 'task-list' %}">✅ <span>Tasks</span></a>
-                <a href="{% url 'analytics' %}">🤖 <span>AI</span></a>
-            </nav>
-
+            <div>
+                <h2>Productivity</h2>
+                <span>Admin Panel</span>
+            </div>
         </div>
 
-        <!-- FOOTER -->
-        <div class="sidebar-footer">
-            {% if user.is_authenticated %}
+        <div class="user-card">
+            <div class="avatar">
+                {{ user.username|first|upper }}
+            </div>
+            <div>
+                <h4>{{ user.username }}</h4>
+                <p>Administrator</p>
+            </div>
+        </div>
 
-                <div class="user-chip">
-                    <strong>{{ user.username }}</strong>
-                    <small class="muted">Admin</small>
-                </div>
+        <nav class="menu">
 
-                <a class="side-btn" href="{% url 'profile' %}">👤 Profile</a>
-                <a class="side-btn" href="{% url 'password_change' %}">🔒 Password</a>
+            <a href="{% url 'dashboard' %}">
+                <i class="fa-solid fa-chart-line"></i>
+                Dashboard
+            </a>
 
-                <form method="post" action="{% url 'logout' %}">
-                    {% csrf_token %}
-                    <button class="side-btn logout-btn" type="submit">🚪 Logout</button>
-                </form>
+            <a href="{% url 'user-list' %}">
+                <i class="fa-solid fa-users"></i>
+                Users
+            </a>
 
-            {% endif %}
+            <a href="{% url 'team-list' %}">
+                <i class="fa-solid fa-people-group"></i>
+                Teams
+            </a>
+
+            <a href="{% url 'employee-list' %}">
+                <i class="fa-solid fa-id-badge"></i>
+                Employees
+            </a>
+
+            <a href="{% url 'project-list' %}">
+                <i class="fa-solid fa-folder-open"></i>
+                Projects
+            </a>
+
+            <a href="{% url 'task-list' %}">
+                <i class="fa-solid fa-list-check"></i>
+                Tasks
+            </a>
+
+            <a href="{% url 'approval-queue' %}">
+                <i class="fa-solid fa-circle-check"></i>
+                Requests
+            </a>
+
+            <a href="{% url 'notification-list' %}">
+                <i class="fa-solid fa-bell"></i>
+                Activities
+            </a>
+
+            <a href="{% url 'audit-log-list' %}">
+                <i class="fa-solid fa-shield-halved"></i>
+                Audit Logs
+            </a>
+
+            <a href="{% url 'analytics' %}">
+                <i class="fa-solid fa-chart-pie"></i>
+                Analytics
+            </a>
+
+        </nav>
+
+        <div class="sidebar-bottom">
+
+            <a class="sidebar-btn" href="{% url 'profile' %}">
+                <i class="fa-solid fa-user"></i>
+                Profile
+            </a>
+
+            <a class="sidebar-btn" href="{% url 'password_change' %}">
+                <i class="fa-solid fa-key"></i>
+                Password
+            </a>
+
+            <form method="post" action="{% url 'logout' %}">
+                {% csrf_token %}
+                <button class="logout-btn">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                    Logout
+                </button>
+            </form>
+
         </div>
 
     </aside>
 
-    <!-- MAIN -->
     <main class="main-content">
 
         <div class="topbar">
-            <button onclick="toggleTheme()" class="toggle-btn">🌙</button>
-            <div class="user-badge">{{ user.username }}</div>
+            <div>
+                <h1>Admin Dashboard</h1>
+                <p>Manage users, projects and productivity efficiently.</p>
+            </div>
+
+            <div class="top-actions">
+                <button class="icon-btn">
+                    <i class="fa-solid fa-bell"></i>
+                </button>
+
+                <button class="icon-btn">
+                    <i class="fa-solid fa-gear"></i>
+                </button>
+
+                <div class="profile-pill">
+                    {{ user.username }}
+                </div>
+            </div>
         </div>
 
         {% if messages %}
             {% for message in messages %}
-                <div class="message">{{ message }}</div>
+                <div class="alert">
+                    {{ message }}
+                </div>
             {% endfor %}
         {% endif %}
 
-        {% block content %}{% endblock %}
+        <div class="page-content">
+            {% block content %}
+            {% endblock %}
+        </div>
 
     </main>
 
 </div>
-
-<script>
-const btn = document.querySelector(".toggle-btn");
-
-function toggleTheme() {
-    document.body.classList.toggle("light-mode");
-
-    if (document.body.classList.contains("light-mode")) {
-        localStorage.setItem("theme", "light");
-        btn.innerHTML = "☀️";
-    } else {
-        localStorage.setItem("theme", "dark");
-        btn.innerHTML = "🌙";
-    }
-}
-
-function toggleSidebar() {
-    const sidebar = document.getElementById("sidebar");
-    sidebar.classList.toggle("collapsed");
-
-    localStorage.setItem("sidebar",
-        sidebar.classList.contains("collapsed") ? "collapsed" : "open"
-    );
-}
-
-window.onload = function () {
-    if (localStorage.getItem("theme") === "light") {
-        document.body.classList.add("light-mode");
-        btn.innerHTML = "☀️";
-    }
-
-    if (localStorage.getItem("sidebar") === "collapsed") {
-        document.getElementById("sidebar").classList.add("collapsed");
-    }
-};
-</script>
 
 </body>
 </html>

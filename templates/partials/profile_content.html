@@ -1,0 +1,311 @@
+<style>
+.profile-header{
+    margin-bottom:30px;
+}
+
+.profile-header h1{
+    font-size:32px;
+    color:#0f172a;
+    margin-bottom:6px;
+}
+
+.profile-header p{
+    color:#64748b;
+}
+
+.profile-layout{
+    display:grid;
+    grid-template-columns:380px 1fr;
+    gap:24px;
+}
+
+.profile-card,
+.settings-card{
+    background:white;
+    border-radius:24px;
+    padding:28px;
+    box-shadow:0 10px 30px rgba(0,0,0,.05);
+}
+
+.profile-top{
+    text-align:center;
+}
+
+.avatar{
+    width:110px;
+    height:110px;
+    margin:0 auto 18px;
+    border-radius:50%;
+    background:linear-gradient(
+        135deg,
+        #4f46e5,
+        #7c3aed
+    );
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    color:white;
+    font-size:42px;
+    font-weight:700;
+}
+
+.profile-name{
+    font-size:22px;
+    font-weight:700;
+    color:#0f172a;
+}
+
+.role-badge{
+    display:inline-block;
+    margin-top:10px;
+    padding:8px 14px;
+    border-radius:999px;
+    background:#eef2ff;
+    color:#4338ca;
+    font-size:13px;
+    font-weight:600;
+}
+
+.profile-info{
+    margin-top:25px;
+}
+
+.info-row{
+    display:flex;
+    justify-content:space-between;
+    padding:14px 0;
+    border-bottom:1px solid #e5e7eb;
+}
+
+.info-label{
+    color:#64748b;
+}
+
+.info-value{
+    color:#0f172a;
+    font-weight:600;
+}
+
+.password-btn{
+    display:block;
+    margin-top:25px;
+    text-align:center;
+    text-decoration:none;
+    background:#f1f5f9;
+    color:#334155;
+    padding:12px;
+    border-radius:12px;
+    font-weight:600;
+    transition:.25s;
+}
+
+.password-btn:hover{
+    background:#e2e8f0;
+}
+
+.settings-card h3{
+    margin-bottom:24px;
+    color:#0f172a;
+}
+
+.form-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
+    gap:18px;
+}
+
+.form-group{
+    display:flex;
+    flex-direction:column;
+}
+
+.form-group label{
+    margin-bottom:8px;
+    font-weight:600;
+    color:#334155;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea{
+    width:100%;
+    padding:12px 14px;
+    border:1px solid #dbe2ea;
+    border-radius:12px;
+    transition:.25s;
+    background:white;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus{
+    outline:none;
+    border-color:#6366f1;
+    box-shadow:0 0 0 4px rgba(99,102,241,.15);
+}
+
+.form-group textarea{
+    min-height:120px;
+    resize:vertical;
+}
+
+.helptext{
+    margin-top:5px;
+    font-size:12px;
+    color:#64748b;
+}
+
+.errorlist{
+    margin-top:6px;
+    color:#dc2626;
+    list-style:none;
+    padding:0;
+}
+
+.save-btn{
+    margin-top:25px;
+    border:none;
+    background:linear-gradient(
+        135deg,
+        #4f46e5,
+        #7c3aed
+    );
+    color:white;
+    padding:14px 24px;
+    border-radius:12px;
+    cursor:pointer;
+    font-weight:600;
+    transition:.25s;
+}
+
+.save-btn:hover{
+    transform:translateY(-2px);
+    box-shadow:0 10px 25px rgba(79,70,229,.25);
+}
+
+@media(max-width:992px){
+
+    .profile-layout{
+        grid-template-columns:1fr;
+    }
+
+}
+</style>
+
+<!-- Header -->
+<section class="profile-header">
+
+    <h1>My Profile</h1>
+
+    <p>
+        Manage your account information and personal settings.
+    </p>
+
+</section>
+
+<!-- Layout -->
+<section class="profile-layout">
+
+    <!-- Profile Card -->
+    <div class="profile-card">
+
+        <div class="profile-top">
+
+            <div class="avatar">
+                {{ profile_user.username|first|upper }}
+            </div>
+
+            <div class="profile-name">
+                {{ profile_user.username }}
+            </div>
+
+            <span class="role-badge">
+                {{ current_role|title }}
+            </span>
+
+        </div>
+
+        <div class="profile-info">
+
+            <div class="info-row">
+                <span class="info-label">
+                    Username
+                </span>
+
+                <span class="info-value">
+                    {{ profile_user.username }}
+                </span>
+            </div>
+
+            <div class="info-row">
+                <span class="info-label">
+                    Email
+                </span>
+
+                <span class="info-value">
+                    {{ profile_user.email }}
+                </span>
+            </div>
+
+            <div class="info-row">
+                <span class="info-label">
+                    Role
+                </span>
+
+                <span class="info-value">
+                    {{ current_role|title }}
+                </span>
+            </div>
+
+        </div>
+
+        <a href="{% url 'password_change' %}"
+           class="password-btn">
+            Change Password
+        </a>
+
+    </div>
+
+    <!-- Settings Form -->
+    <div class="settings-card">
+
+        <h3>Update Profile</h3>
+
+        <form method="post">
+
+            {% csrf_token %}
+
+            <div class="form-grid">
+
+                {% for field in form %}
+
+                    <div class="form-group">
+
+                        {{ field.label_tag }}
+
+                        {{ field }}
+
+                        {% if field.help_text %}
+                            <small class="helptext">
+                                {{ field.help_text }}
+                            </small>
+                        {% endif %}
+
+                        {{ field.errors }}
+
+                    </div>
+
+                {% endfor %}
+
+            </div>
+
+            <button type="submit"
+                    class="save-btn">
+                Save Changes
+            </button>
+
+        </form>
+
+    </div>
+
+</section>

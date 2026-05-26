@@ -1,21 +1,9 @@
 from django import forms
 from django.contrib.auth.models import User
+from django.utils import timezone
 from django.utils.crypto import get_random_string
 
-from .models import (
-    Employee,
-    LeaveRequest,
-    Milestone,
-    PerformanceReview,
-    Project,
-    RecurringTask,
-    Task,
-    TaskAttachment,
-    TaskComment,
-    TaskLog,
-    Team,
-    UserProfile,
-)
+from .models import Activity, AppRole, Attachment, Employee, Project, Request, Task, TaskLog, Team, assign_user_role
 
 
 class DateInput(forms.DateInput):
@@ -23,7 +11,7 @@ class DateInput(forms.DateInput):
 
 
 class UserAccountForm(forms.ModelForm):
-    role = forms.ChoiceField(choices=UserProfile.Role.choices)
+    role = forms.ChoiceField(choices=AppRole.choices)
     password = forms.CharField(widget=forms.PasswordInput(), required=False, help_text='Leave blank to auto-generate.')
 
     class Meta:
@@ -34,21 +22,11 @@ class UserAccountForm(forms.ModelForm):
         user = super().save(commit=False)
         raw_password = self.cleaned_data['password'] or get_random_string(10)
         user.set_password(raw_password)
-        role = self.cleaned_data['role']
-        if role == UserProfile.Role.ADMIN:
-            user.is_staff = True
-            user.is_superuser = True
-        elif role == UserProfile.Role.MANAGER:
-            user.is_staff = True
-            user.is_superuser = False
-        else:
-            user.is_staff = False
-            user.is_superuser = False
         if commit:
             user.save()
-            UserProfile.objects.update_or_create(user=user, defaults={'role': role})
+            assign_user_role(user, self.cleaned_data['role'])
         user.generated_password = raw_password
-        user.generated_role = role
+        user.generated_role = self.cleaned_data['role']
         return user
 
 
@@ -78,14 +56,8 @@ class ProfileForm(forms.ModelForm):
         return user
 
 
-class UserStatusForm(forms.ModelForm):
-    class Meta:
-        model = User
-        fields = ['is_active']
-
-
 class UserAdminEditForm(forms.ModelForm):
-    role = forms.ChoiceField(choices=UserProfile.Role.choices)
+    role = forms.ChoiceField(choices=AppRole.choices)
 
     class Meta:
         model = User
@@ -94,16 +66,18 @@ class UserAdminEditForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if self.instance.pk:
-            self.fields['role'].initial = getattr(getattr(self.instance, 'profile', None), 'role', UserProfile.Role.EMPLOYEE)
+            if self.instance.is_superuser:
+                self.fields['role'].initial = AppRole.ADMIN
+            elif self.instance.groups.filter(name=AppRole.MANAGER).exists():
+                self.fields['role'].initial = AppRole.MANAGER
+            else:
+                self.fields['role'].initial = AppRole.EMPLOYEE
 
     def save(self, commit=True):
         user = super().save(commit=False)
-        role = self.cleaned_data['role']
-        user.is_superuser = role == UserProfile.Role.ADMIN
-        user.is_staff = role in {UserProfile.Role.ADMIN, UserProfile.Role.MANAGER}
         if commit:
             user.save()
-            UserProfile.objects.update_or_create(user=user, defaults={'role': role})
+            assign_user_role(user, self.cleaned_data['role'])
         return user
 
 
@@ -133,7 +107,7 @@ class EmployeeForm(forms.ModelForm):
             'email',
             'job_title',
             'skills',
-            'experience_years',
+            'experience',
             'weekly_capacity_hours',
             'availability',
         ]
@@ -165,7 +139,7 @@ class EmployeeForm(forms.ModelForm):
                 email=self.cleaned_data['email'],
                 password=created_password,
             )
-            UserProfile.objects.update_or_create(user=created_user, defaults={'role': UserProfile.Role.EMPLOYEE})
+            assign_user_role(created_user, AppRole.EMPLOYEE)
             employee.user = created_user
 
         if commit:
@@ -186,22 +160,11 @@ class ProjectForm(forms.ModelForm):
         }
 
 
-class MilestoneForm(forms.ModelForm):
-    class Meta:
-        model = Milestone
-        fields = ['project', 'name', 'description', 'deadline', 'status']
-        widgets = {
-            'description': forms.Textarea(attrs={'rows': 3}),
-            'deadline': DateInput(),
-        }
-
-
 class TaskForm(forms.ModelForm):
     class Meta:
         model = Task
         fields = [
             'project',
-            'milestone',
             'title',
             'description',
             'assigned_to',
@@ -224,7 +187,7 @@ class TaskForm(forms.ModelForm):
 class TaskUpdateForm(forms.ModelForm):
     class Meta:
         model = Task
-        fields = ['project', 'milestone', 'assigned_to', 'deadline', 'priority', 'status', 'progress', 'requires_approval']
+        fields = ['project', 'assigned_to', 'deadline', 'priority', 'status', 'progress', 'requires_approval']
         widgets = {
             'deadline': DateInput(),
         }
@@ -232,17 +195,19 @@ class TaskUpdateForm(forms.ModelForm):
 
 class TaskApprovalForm(forms.ModelForm):
     class Meta:
-        model = Task
-        fields = ['approval_status', 'manager_remark']
+        model = Request
+        fields = ['status', 'remarks']
         widgets = {
-            'manager_remark': forms.Textarea(attrs={'rows': 4}),
+            'remarks': forms.Textarea(attrs={'rows': 4}),
         }
 
 
 class TaskLogForm(forms.ModelForm):
+    progress_after_log = forms.IntegerField(min_value=0, max_value=100, required=False, label='Current progress')
+
     class Meta:
         model = TaskLog
-        fields = ['task', 'employee', 'hours_spent', 'log_date', 'progress_after_log', 'notes']
+        fields = ['task', 'employee', 'hours_spent', 'log_date', 'notes']
         widgets = {
             'log_date': DateInput(),
             'notes': forms.Textarea(attrs={'rows': 3}),
@@ -257,62 +222,59 @@ class TaskLogForm(forms.ModelForm):
             self.fields['task'].queryset = Task.objects.filter(assigned_to=employee).exclude(status=Task.Status.COMPLETED)
             self.fields['employee'].queryset = Employee.objects.filter(pk=employee.pk)
             self.fields['employee'].initial = employee
-            if role == UserProfile.Role.EMPLOYEE:
+            if role == AppRole.EMPLOYEE:
                 self.fields['employee'].widget = forms.HiddenInput()
 
         self.fields['progress_after_log'].help_text = 'Update the current progress for this task.'
 
 
 class PerformanceReviewForm(forms.ModelForm):
+    employee = forms.ModelChoiceField(queryset=Employee.objects.none())
+    review_date = forms.DateField(initial=timezone.localdate, widget=DateInput())
+
     class Meta:
-        model = PerformanceReview
-        fields = ['employee', 'review_date', 'rating', 'remarks']
+        model = Activity
+        fields = ['title', 'message', 'rating']
         widgets = {
-            'review_date': DateInput(),
-            'remarks': forms.Textarea(attrs={'rows': 4}),
+            'message': forms.Textarea(attrs={'rows': 4}),
         }
+
+    def __init__(self, *args, **kwargs):
+        employee_queryset = kwargs.pop('employee_queryset', Employee.objects.none())
+        super().__init__(*args, **kwargs)
+        self.fields['employee'].queryset = employee_queryset
 
 
 class TaskCommentForm(forms.ModelForm):
     class Meta:
-        model = TaskComment
-        fields = ['body']
+        model = Activity
+        fields = ['message']
         widgets = {
-            'body': forms.Textarea(attrs={'rows': 3, 'placeholder': 'Add a comment...'}),
+            'message': forms.Textarea(attrs={'rows': 3, 'placeholder': 'Add a comment...'}),
         }
 
 
 class TaskAttachmentForm(forms.ModelForm):
     class Meta:
-        model = TaskAttachment
+        model = Attachment
         fields = ['label', 'file']
 
 
 class LeaveRequestForm(forms.ModelForm):
     class Meta:
-        model = LeaveRequest
-        fields = ['start_date', 'end_date', 'reason']
+        model = Request
+        fields = ['start_date', 'end_date', 'remarks']
         widgets = {
             'start_date': DateInput(),
             'end_date': DateInput(),
-            'reason': forms.Textarea(attrs={'rows': 3}),
+            'remarks': forms.Textarea(attrs={'rows': 3}),
         }
 
 
 class LeaveApprovalForm(forms.ModelForm):
     class Meta:
-        model = LeaveRequest
-        fields = ['status', 'manager_note']
+        model = Request
+        fields = ['status', 'remarks']
         widgets = {
-            'manager_note': forms.Textarea(attrs={'rows': 3}),
-        }
-
-
-class RecurringTaskForm(forms.ModelForm):
-    class Meta:
-        model = RecurringTask
-        fields = ['project', 'title', 'description', 'assigned_to', 'frequency', 'next_due_date', 'is_active']
-        widgets = {
-            'description': forms.Textarea(attrs={'rows': 3}),
-            'next_due_date': DateInput(),
+            'remarks': forms.Textarea(attrs={'rows': 3}),
         }

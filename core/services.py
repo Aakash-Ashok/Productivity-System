@@ -6,12 +6,13 @@ from datetime import timedelta
 import pandas as pd
 from django.conf import settings
 from django.core.mail import send_mail
-from django.db.models import Count, F, Q, Sum
+from django.db.models import Count, Q, Sum
+from django.db.models.functions import TruncDate
 from django.utils import timezone
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LinearRegression
 
-from .models import AIResult, AuditLog, Employee, Notification, PerformanceMetric, Project, Task, TaskLog, Team
+from .models import AIResult, Activity, Employee, Project, Request, Task, TaskLog, Team
 
 
 @dataclass
@@ -19,6 +20,15 @@ class AllocationSuggestion:
     employee: Employee
     score: float
     reasons: list[str]
+
+
+@dataclass
+class ProjectAIInsight:
+    project: Project
+    health_score: int
+    delay_risk: float
+    completion_confidence: int
+    recommended_action: str
 
 
 def send_credentials_email(email: str, username: str, password: str, role: str) -> None:
@@ -35,24 +45,46 @@ def send_credentials_email(email: str, username: str, password: str, role: str) 
     send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [email], fail_silently=True)
 
 
-def create_notification(recipient, title: str, message: str, kind: str = Notification.Kind.SYSTEM) -> None:
-    if recipient is None:
-        return
-    Notification.objects.create(
-        recipient=recipient,
+def create_activity(
+    activity_type: str,
+    *,
+    user=None,
+    task: Task | None = None,
+    project: Project | None = None,
+    title: str = '',
+    message: str,
+    rating: int | None = None,
+    is_read: bool = False,
+) -> Activity:
+    return Activity.objects.create(
+        activity_type=activity_type,
+        user=user,
+        task=task,
+        project=project,
         title=title,
         message=message,
-        kind=kind,
+        rating=rating,
+        is_read=is_read,
+    )
+
+
+def create_notification(recipient, title: str, message: str) -> None:
+    if recipient is None:
+        return
+    create_activity(
+        Activity.Type.NOTIFICATION,
+        user=recipient,
+        title=title,
+        message=message,
     )
 
 
 def create_audit_log(actor, action: str, entity_type: str, entity_id: int, details: str = '') -> None:
-    AuditLog.objects.create(
-        actor=actor,
-        action=action,
-        entity_type=entity_type,
-        entity_id=entity_id,
-        details=details,
+    create_activity(
+        Activity.Type.AUDIT,
+        user=actor,
+        title=f'{action} ({entity_type} #{entity_id})',
+        message=details or action,
     )
 
 
@@ -70,53 +102,82 @@ def sync_project_status(project: Project | None) -> None:
     project.save(update_fields=['status'])
 
 
-def refresh_performance_metrics() -> None:
+def employee_metrics(employee: Employee) -> dict[str, float | int | str]:
+    completed_tasks = employee.tasks.filter(status=Task.Status.COMPLETED)
+    delayed_tasks = sum(1 for task in completed_tasks if task.completed_at and task.completed_at.date() > task.deadline)
+    active_tasks = employee.tasks.exclude(status=Task.Status.COMPLETED).count()
+
+    durations = []
+    for task in completed_tasks:
+        if task.completed_at:
+            durations.append((task.completed_at.date() - task.created_at.date()).days or 1)
+    avg_completion_time = round(sum(durations) / len(durations), 2) if durations else 0.0
+
     today = timezone.localdate()
     seven_days_ago = today - timedelta(days=6)
+    daily_hours = (
+        employee.task_logs.filter(log_date__gte=seven_days_ago)
+        .values('log_date')
+        .annotate(total_hours=Sum('hours_spent'))
+    )
+    average_daily_hours = (
+        round(sum(float(day['total_hours'] or 0) for day in daily_hours) / len(daily_hours), 2)
+        if daily_hours
+        else 0.0
+    )
 
-    for employee in Employee.objects.select_related('team').all():
-        completed_tasks = employee.tasks.filter(status=Task.Status.COMPLETED)
-        delayed_tasks = completed_tasks.filter(completed_at__date__gt=F('deadline')).count()
-        active_tasks = employee.tasks.exclude(status=Task.Status.COMPLETED).count()
+    total_tasks = employee.tasks.count()
+    completion_rate = round((completed_tasks.count() / total_tasks) * 100, 2) if total_tasks else 0.0
 
-        durations = []
-        for task in completed_tasks:
-            if task.completed_at:
-                durations.append((task.completed_at.date() - task.created_at.date()).days or 1)
-        avg_completion_time = round(sum(durations) / len(durations), 2) if durations else 0.0
+    burnout_risk = 'Low'
+    if active_tasks >= 6 or average_daily_hours > 9:
+        burnout_risk = 'High'
+    elif active_tasks >= 4 or average_daily_hours > 7:
+        burnout_risk = 'Medium'
 
-        daily_hours = (
-            employee.task_logs.filter(log_date__gte=seven_days_ago)
-            .values('log_date')
-            .annotate(total_hours=Sum('hours_spent'))
-        )
-        average_daily_hours = (
-            round(sum(float(day['total_hours'] or 0) for day in daily_hours) / len(daily_hours), 2)
-            if daily_hours
-            else 0.0
-        )
+    return {
+        'tasks_completed': completed_tasks.count(),
+        'avg_completion_time': avg_completion_time,
+        'delayed_tasks': delayed_tasks,
+        'active_tasks': active_tasks,
+        'average_daily_hours': average_daily_hours,
+        'burnout_risk': burnout_risk,
+        'completion_rate': completion_rate,
+    }
 
-        total_tasks = employee.tasks.count()
-        completion_rate = round((completed_tasks.count() / total_tasks) * 100, 2) if total_tasks else 0.0
 
-        burnout_risk = 'Low'
-        if active_tasks >= 6 or average_daily_hours > 9:
-            burnout_risk = 'High'
-        elif active_tasks >= 4 or average_daily_hours > 7:
-            burnout_risk = 'Medium'
+def dashboard_summary() -> dict[str, object]:
+    all_tasks = Task.objects.select_related('assigned_to', 'project')
+    all_projects = Project.objects.select_related('team')
+    employees = Employee.objects.select_related('team')
+    delayed_tasks = [task for task in all_tasks if task.is_delayed]
+    employee_rows = [(employee, employee_metrics(employee)) for employee in employees]
+    project_rows = [project_ai_summary(project) for project in all_projects]
+    team_rows = [team_health_summary(team) for team in Team.objects.select_related('manager').all()]
 
-        PerformanceMetric.objects.update_or_create(
-            employee=employee,
-            defaults={
-                'tasks_completed': completed_tasks.count(),
-                'avg_completion_time': avg_completion_time,
-                'delayed_tasks': delayed_tasks,
-                'active_tasks': active_tasks,
-                'average_daily_hours': average_daily_hours,
-                'burnout_risk': burnout_risk,
-                'completion_rate': completion_rate,
-            },
-        )
+    return {
+        'total_tasks': all_tasks.count(),
+        'completed_tasks': all_tasks.filter(status=Task.Status.COMPLETED).count(),
+        'delayed_tasks': len(delayed_tasks),
+        'total_projects': all_projects.count(),
+        'total_teams': Team.objects.count(),
+        'total_employees': employees.count(),
+        'burnout_alerts': [(employee, data) for employee, data in employee_rows if data['burnout_risk'] != 'Low'][:6],
+        'top_performers': sorted(employee_rows, key=lambda row: row[1]['completion_rate'], reverse=True)[:5],
+        'recent_requests': Request.objects.select_related('employee', 'task')[:6],
+        'top_risky_projects': sorted(project_rows, key=lambda row: row.delay_risk, reverse=True)[:5],
+        'team_health_rows': sorted(team_rows, key=lambda row: row['health_score'])[:5],
+    }
+
+
+def productivity_trend(tasks) -> list[dict[str, object]]:
+    rows = (
+        tasks.annotate(day=TruncDate('created_at'))
+        .values('day')
+        .annotate(total=Count('id'), completed=Count('id', filter=Q(status=Task.Status.COMPLETED)))
+        .order_by('day')
+    )
+    return list(rows)
 
 
 def predict_task_completion_hours(task: Task) -> float:
@@ -126,14 +187,14 @@ def predict_task_completion_hours(task: Task) -> float:
             'task__difficulty',
             'task__progress',
             'task__estimated_hours',
-            'employee__experience_years',
+            'employee__experience',
             'hours_spent',
         )
     )
 
     if len(logs) >= 5:
         frame = pd.DataFrame(logs)
-        X = frame[['task__difficulty', 'task__progress', 'task__estimated_hours', 'employee__experience_years']]
+        X = frame[['task__difficulty', 'task__progress', 'task__estimated_hours', 'employee__experience']]
         y = frame['hours_spent']
         model = LinearRegression()
         model.fit(X, y)
@@ -143,7 +204,7 @@ def predict_task_completion_hours(task: Task) -> float:
                     'task__difficulty': task.difficulty,
                     'task__progress': task.progress,
                     'task__estimated_hours': float(task.estimated_hours),
-                    'employee__experience_years': task.assigned_to.experience_years if task.assigned_to else 0,
+                    'employee__experience': task.assigned_to.experience if task.assigned_to else 0,
                 }
             ]
         )
@@ -151,7 +212,7 @@ def predict_task_completion_hours(task: Task) -> float:
 
     baseline = float(task.estimated_hours) + (task.difficulty * 1.2)
     if task.assigned_to:
-        baseline -= min(task.assigned_to.experience_years, 6) * 0.35
+        baseline -= min(task.assigned_to.experience, 6) * 0.35
     return round(max(baseline - (task.progress * 0.05), 1.0), 2)
 
 
@@ -164,18 +225,18 @@ def predict_delay_risk(task: Task) -> dict[str, str | float]:
                 'difficulty': item.difficulty,
                 'progress': item.progress,
                 'estimated_hours': float(item.estimated_hours),
-                'experience_years': item.assigned_to.experience_years if item.assigned_to else 0,
+                'experience': item.assigned_to.experience if item.assigned_to else 0,
                 'remaining_days': remaining_days,
                 'delayed': int(bool(item.completed_at and item.completed_at.date() > item.deadline) or item.is_delayed),
             }
         )
 
     remaining_days = (task.deadline - timezone.localdate()).days
-    experience = task.assigned_to.experience_years if task.assigned_to else 0
+    experience = task.assigned_to.experience if task.assigned_to else 0
 
     if len(rows) >= 8 and len({row['delayed'] for row in rows}) > 1:
         frame = pd.DataFrame(rows)
-        X = frame[['difficulty', 'progress', 'estimated_hours', 'experience_years', 'remaining_days']]
+        X = frame[['difficulty', 'progress', 'estimated_hours', 'experience', 'remaining_days']]
         y = frame['delayed']
         model = RandomForestClassifier(n_estimators=120, random_state=42)
         model.fit(X, y)
@@ -186,7 +247,7 @@ def predict_delay_risk(task: Task) -> dict[str, str | float]:
                         'difficulty': task.difficulty,
                         'progress': task.progress,
                         'estimated_hours': float(task.estimated_hours),
-                        'experience_years': experience,
+                        'experience': experience,
                         'remaining_days': remaining_days,
                     }
                 ]
@@ -200,7 +261,7 @@ def predict_delay_risk(task: Task) -> dict[str, str | float]:
             probability += 0.25
         if task.progress < 50:
             probability += 0.20
-        if task.priority == Task.Priority.CRITICAL:
+        if task.priority == Task.Priority.HIGH:
             probability += 0.12
         if experience <= 1:
             probability += 0.10
@@ -216,19 +277,18 @@ def predict_delay_risk(task: Task) -> dict[str, str | float]:
 
 
 def recommend_employee_for_task(task: Task) -> list[AllocationSuggestion]:
-    refresh_performance_metrics()
     required_skills = set(task.required_skill_list)
     suggestions: list[AllocationSuggestion] = []
 
-    employees = Employee.objects.select_related('team', 'performance_metric').all()
+    employees = Employee.objects.select_related('team').all()
     if task.project and task.project.team_id:
         employees = employees.filter(team=task.project.team)
 
     for employee in employees:
-        metric = getattr(employee, 'performance_metric', None)
+        metric = employee_metrics(employee)
         matched_skills = len(required_skills.intersection(set(employee.skill_list)))
         skill_score = matched_skills / max(len(required_skills), 1)
-        performance_score = (metric.completion_rate / 100) if metric else 0.0
+        performance_score = metric['completion_rate'] / 100 if metric else 0.0
         active_task_count = employee.tasks.exclude(status=Task.Status.COMPLETED).count()
         workload_score = max(0.0, 1 - (active_task_count / 8))
         score = (skill_score * 0.5) + (performance_score * 0.3) + (workload_score * 0.2)
@@ -258,150 +318,191 @@ def skill_gap_analysis(task: Task) -> dict[str, object]:
         'django': 'Django for Beginners',
         'sql': 'SQLBolt',
         'flutter': 'Flutter Codelabs',
-        'pandas': 'Pandas official tutorials',
+        'pandas': 'Pandas Foundations',
         'statistics': 'Intro to Statistics',
-        'testing': 'Software Testing Fundamentals',
-        'reporting': 'Data Visualization Basics',
+        'reporting': 'Business Reporting Basics',
     }
-    learning_recommendations = [learning_map[skill] for skill in missing_skills if skill in learning_map]
+    recommended_training = [learning_map[skill] for skill in missing_skills if skill in learning_map]
     return {
         'matched_skills': matched_skills,
         'missing_skills': missing_skills,
-        'learning_recommendations': learning_recommendations,
+        'recommended_training': recommended_training,
     }
 
 
-def recommended_task_action(task: Task, delay_risk: dict[str, str | float]) -> str:
-    if task.assigned_to is None:
-        return 'Assign the task using smart allocation.'
-    if delay_risk['label'] == 'High':
-        return 'Escalate, split scope, or extend deadline immediately.'
-    if getattr(task.assigned_to, 'performance_metric', None) and task.assigned_to.performance_metric.burnout_risk == 'High':
-        return 'Consider reassigning or reducing workload for the assignee.'
-    if task.progress < 25:
-        return 'Schedule a manager check-in and request a progress update.'
-    return 'Continue monitoring current progress.'
+def task_anomaly_analysis(task: Task) -> dict[str, object]:
+    logs = list(task.logs.order_by('-log_date')[:5])
+    signals: list[str] = []
+    severity_score = 0
+
+    if not logs:
+        return {
+            'label': 'Low',
+            'score': 0,
+            'signals': ['Not enough task logs yet for anomaly detection.'],
+        }
+
+    hour_values = [float(log.hours_spent) for log in logs]
+    average_hours = sum(hour_values) / len(hour_values)
+    max_hours = max(hour_values)
+
+    if len(logs) >= 3 and max_hours >= max(average_hours * 1.8, 8):
+        severity_score += 35
+        signals.append('Recent work log shows an unusual spike in hours.')
+
+    if task.progress <= 40 and len(logs) >= 3:
+        severity_score += 25
+        signals.append('Several work logs exist, but task progress is still low.')
+
+    if task.deadline <= timezone.localdate() + timedelta(days=2) and task.progress < 70:
+        severity_score += 30
+        signals.append('Deadline is near while progress is still behind target.')
+
+    if task.assigned_to:
+        metrics = employee_metrics(task.assigned_to)
+        if metrics['burnout_risk'] == 'High':
+            severity_score += 20
+            signals.append('Assigned employee is already showing high workload pressure.')
+
+    if severity_score >= 60:
+        label = 'High'
+    elif severity_score >= 30:
+        label = 'Medium'
+    else:
+        label = 'Low'
+
+    if not signals:
+        signals.append('No abnormal work pattern detected.')
+
+    return {
+        'label': label,
+        'score': min(severity_score, 100),
+        'signals': signals,
+    }
+
+
+def employee_ai_profile(employee: Employee) -> dict[str, object]:
+    metrics = employee_metrics(employee)
+    active_tasks = list(employee.tasks.exclude(status=Task.Status.COMPLETED))
+    missing_skills = set()
+    for task in active_tasks:
+        gap = skill_gap_analysis(task)
+        missing_skills.update(gap['missing_skills'])
+
+    completion_component = min(metrics['completion_rate'], 100) * 0.5
+    delay_penalty = min(metrics['delayed_tasks'] * 8, 30)
+    workload_penalty = 20 if metrics['burnout_risk'] == 'High' else 10 if metrics['burnout_risk'] == 'Medium' else 0
+    productivity_score = max(0, round(completion_component + 50 - delay_penalty - workload_penalty))
+
+    focus_area = 'Execution is stable'
+    if missing_skills:
+        focus_area = f"Upskill in {', '.join(sorted(missing_skills)[:3])}"
+    elif metrics['burnout_risk'] != 'Low':
+        focus_area = 'Reduce workload pressure'
+    elif metrics['avg_completion_time'] > 5:
+        focus_area = 'Improve delivery speed'
+
+    return {
+        **metrics,
+        'productivity_score': productivity_score,
+        'focus_area': focus_area,
+        'learning_priority': sorted(missing_skills),
+    }
+
+
+def project_ai_summary(project: Project) -> ProjectAIInsight:
+    tasks = list(project.tasks.select_related('assigned_to').all())
+    if not tasks:
+        return ProjectAIInsight(
+            project=project,
+            health_score=100,
+            delay_risk=0.0,
+            completion_confidence=95,
+            recommended_action='Start project planning and assign the first tasks.',
+        )
+
+    open_tasks = [task for task in tasks if task.status != Task.Status.COMPLETED]
+    delay_values = [float(predict_delay_risk(task)['probability']) for task in open_tasks] or [0.0]
+    average_delay = round(sum(delay_values) / len(delay_values), 2)
+    completion_confidence = max(5, round(100 - average_delay - (len(open_tasks) * 4)))
+    health_score = max(0, round(project.progress * 0.5 + completion_confidence * 0.5))
+
+    if average_delay >= 65:
+        recommended_action = 'Reassign high-risk tasks and review deadlines immediately.'
+    elif average_delay >= 40:
+        recommended_action = 'Monitor closely and support the tasks with medium delay risk.'
+    elif project.progress < 35 and open_tasks:
+        recommended_action = 'Increase execution focus and close the early backlog.'
+    else:
+        recommended_action = 'Project is on a healthy track.'
+
+    return ProjectAIInsight(
+        project=project,
+        health_score=health_score,
+        delay_risk=average_delay,
+        completion_confidence=completion_confidence,
+        recommended_action=recommended_action,
+    )
+
+
+def team_health_summary(team: Team) -> dict[str, object]:
+    employees = list(team.employees.all())
+    if not employees:
+        return {
+            'team': team,
+            'health_score': 100,
+            'burnout_count': 0,
+            'active_tasks': 0,
+            'recommended_action': 'Assign employees to begin active delivery.',
+        }
+
+    profiles = [employee_ai_profile(employee) for employee in employees]
+    avg_productivity = sum(profile['productivity_score'] for profile in profiles) / len(profiles)
+    burnout_count = sum(1 for profile in profiles if profile['burnout_risk'] != 'Low')
+    active_tasks = sum(profile['active_tasks'] for profile in profiles)
+    health_score = max(0, round(avg_productivity - (burnout_count * 8)))
+
+    if burnout_count >= max(1, len(employees) // 2):
+        action = 'Balance workload across the team and review deadlines.'
+    elif active_tasks >= len(employees) * 4:
+        action = 'Watch capacity closely; the team is carrying a heavy delivery load.'
+    else:
+        action = 'Team health is stable. Maintain current execution rhythm.'
+
+    return {
+        'team': team,
+        'health_score': health_score,
+        'burnout_count': burnout_count,
+        'active_tasks': active_tasks,
+        'recommended_action': action,
+    }
 
 
 def upsert_ai_result(task: Task) -> AIResult:
     predicted_time = predict_task_completion_hours(task)
     delay_risk = predict_delay_risk(task)
-    suggestions = recommend_employee_for_task(task)
     skill_gap = skill_gap_analysis(task)
-    workload_signal = 'Balanced'
-    burnout_score = 0.0
-    if task.assigned_to and hasattr(task.assigned_to, 'performance_metric'):
-        workload_signal = task.assigned_to.performance_metric.burnout_risk
-        burnout_score = task.assigned_to.performance_metric.average_daily_hours
-    suggestion_text = ', '.join(f'{item.employee.name} ({item.score}%)' for item in suggestions)
+
+    if task.assigned_to:
+        metrics = employee_metrics(task.assigned_to)
+        burnout_signal = metrics['burnout_risk']
+    else:
+        burnout_signal = 'Unassigned'
+
+    recommended_action = 'Proceed as planned'
+    if delay_risk['label'] == 'High':
+        recommended_action = 'Rebalance workload or extend the deadline'
+    elif skill_gap['missing_skills']:
+        recommended_action = 'Provide support or training for missing skills'
+
     ai_result, _ = AIResult.objects.update_or_create(
         task=task,
         defaults={
             'predicted_time': predicted_time,
-            'delay_risk': delay_risk['probability'],
-            'suggestions': suggestion_text,
-            'recommended_action': recommended_task_action(task, delay_risk),
-            'skill_gap': ', '.join(skill_gap['missing_skills']),
-            'learning_recommendations': ', '.join(skill_gap['learning_recommendations']),
-            'workload_signal': workload_signal,
-            'burnout_score': burnout_score,
+            'delay_risk': float(delay_risk['probability']),
+            'suggestions': ', '.join(skill_gap['missing_skills']) or 'Current assignment is a strong fit.',
+            'recommended_action': recommended_action,
+            'workload_signal': burnout_signal,
         },
     )
     return ai_result
-
-
-def team_performance_snapshot():
-    teams = Team.objects.annotate(
-        member_count=Count('employees', distinct=True),
-        project_count=Count('projects', distinct=True),
-        active_tasks=Count('employees__tasks', filter=~Q(employees__tasks__status=Task.Status.COMPLETED), distinct=True),
-        completed_tasks=Count('employees__tasks', filter=Q(employees__tasks__status=Task.Status.COMPLETED), distinct=True),
-    ).order_by('name')
-    snapshots = []
-    for team in teams:
-        metrics = PerformanceMetric.objects.filter(employee__team=team)
-        avg_completion_rate = round(sum(metric.completion_rate for metric in metrics) / len(metrics), 2) if metrics else 0
-        avg_delay = round(sum(metric.delayed_tasks for metric in metrics) / len(metrics), 2) if metrics else 0
-        health_score = round(max(0, 100 - (avg_delay * 8) - max(0, 70 - avg_completion_rate)), 2)
-        snapshots.append(
-            {
-                'team': team,
-                'member_count': team.member_count,
-                'project_count': team.project_count,
-                'active_tasks': team.active_tasks,
-                'completed_tasks': team.completed_tasks,
-                'health_score': health_score,
-                'avg_completion_rate': avg_completion_rate,
-            }
-        )
-    return snapshots
-
-
-def project_progress_snapshot():
-    projects = Project.objects.select_related('team').prefetch_related('tasks')
-    return [
-        {
-            'project': project,
-            'progress': project.progress,
-            'active_tasks': project.tasks.exclude(status=Task.Status.COMPLETED).count(),
-            'completed_tasks': project.tasks.filter(status=Task.Status.COMPLETED).count(),
-        }
-        for project in projects
-    ]
-
-
-def productivity_trend(days: int = 7) -> list[dict[str, object]]:
-    today = timezone.localdate()
-    trend = []
-    for offset in range(days - 1, -1, -1):
-        current = today - timedelta(days=offset)
-        total_hours = TaskLog.objects.filter(log_date=current).aggregate(total=Sum('hours_spent'))['total'] or 0
-        completed = Task.objects.filter(completed_at__date=current).count()
-        trend.append(
-            {
-                'date': current.strftime('%Y-%m-%d'),
-                'hours': float(total_hours),
-                'completed': completed,
-            }
-        )
-    return trend
-
-
-def dashboard_summary() -> dict[str, object]:
-    refresh_performance_metrics()
-    today = timezone.localdate()
-
-    total_tasks = Task.objects.count()
-    completed_tasks = Task.objects.filter(status=Task.Status.COMPLETED).count()
-    delayed_tasks = Task.objects.filter(deadline__lt=today).exclude(status=Task.Status.COMPLETED).count()
-    active_tasks = Task.objects.exclude(status=Task.Status.COMPLETED).count()
-    top_performers = PerformanceMetric.objects.select_related('employee').order_by('-completion_rate', 'avg_completion_time')[:5]
-    burnout_alerts = PerformanceMetric.objects.select_related('employee').exclude(burnout_risk='Low')
-    anomaly_tasks = (
-        Task.objects.annotate(total_logged=Sum('logs__hours_spent'))
-        .filter(Q(total_logged__gt=F('estimated_hours') * 2) | Q(progress__lt=20, deadline__lte=today + timedelta(days=1)))
-        .distinct()[:5]
-    )
-
-    return {
-        'total_users': Employee.objects.count(),
-        'total_teams': Team.objects.count(),
-        'total_projects': Project.objects.count(),
-        'total_tasks': total_tasks,
-        'completed_tasks': completed_tasks,
-        'delayed_tasks': delayed_tasks,
-        'active_tasks': active_tasks,
-        'completion_rate': round((completed_tasks / total_tasks) * 100, 2) if total_tasks else 0,
-        'top_performers': top_performers,
-        'burnout_alerts': burnout_alerts,
-        'anomaly_tasks': anomaly_tasks,
-        'upcoming_deadlines': Task.objects.exclude(status=Task.Status.COMPLETED).select_related('project', 'assigned_to').order_by('deadline')[:5],
-        'workload_chart': list(
-            Employee.objects.annotate(active_count=Count('tasks', filter=~Q(tasks__status=Task.Status.COMPLETED)))
-            .values('name', 'active_count')
-            .order_by('-active_count')
-        ),
-        'team_summary': team_performance_snapshot(),
-        'project_summary': project_progress_snapshot(),
-        'productivity_trend': productivity_trend(),
-    }

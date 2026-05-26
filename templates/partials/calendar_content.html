@@ -1,0 +1,272 @@
+<style>
+.calendar-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:25px;
+    flex-wrap:wrap;
+    gap:15px;
+}
+
+.calendar-title h1{
+    font-size:32px;
+    color:#0f172a;
+    margin-bottom:6px;
+}
+
+.calendar-title p{
+    color:#64748b;
+}
+
+.calendar-badge{
+    background:linear-gradient(135deg,#06b6d4,#3b82f6);
+    color:white;
+    padding:12px 18px;
+    border-radius:999px;
+    font-weight:600;
+}
+
+.calendar-card{
+    background:#fff;
+    border-radius:24px;
+    padding:24px;
+    box-shadow:0 10px 30px rgba(0,0,0,.05);
+}
+
+.timeline-list{
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+}
+
+.timeline-item{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:20px;
+    padding:18px;
+    border:1px solid #e5e7eb;
+    border-radius:18px;
+    transition:.25s;
+}
+
+.timeline-item:hover{
+    transform:translateY(-2px);
+    box-shadow:0 10px 25px rgba(0,0,0,.05);
+}
+
+.timeline-left{
+    display:flex;
+    align-items:center;
+    gap:16px;
+}
+
+.date-circle{
+    min-width:65px;
+    height:65px;
+    border-radius:16px;
+    background:linear-gradient(135deg,#4f46e5,#7c3aed);
+    color:white;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    align-items:center;
+    font-weight:600;
+}
+
+.date-day{
+    font-size:22px;
+    line-height:1;
+}
+
+.date-month{
+    font-size:12px;
+    opacity:.9;
+    text-transform:uppercase;
+}
+
+.task-title{
+    font-size:16px;
+    font-weight:600;
+    color:#0f172a;
+    margin-bottom:4px;
+}
+
+.task-title a{
+    text-decoration:none;
+    color:inherit;
+}
+
+.project-name{
+    color:#64748b;
+    font-size:14px;
+}
+
+.status-badge{
+    padding:8px 14px;
+    border-radius:999px;
+    font-size:13px;
+    font-weight:600;
+}
+
+.status-completed{
+    background:#dcfce7;
+    color:#166534;
+}
+
+.status-progress{
+    background:#dbeafe;
+    color:#1d4ed8;
+}
+
+.status-pending{
+    background:#fef3c7;
+    color:#92400e;
+}
+
+.status-delayed{
+    background:#fee2e2;
+    color:#b91c1c;
+}
+
+.empty-state{
+    text-align:center;
+    padding:60px 20px;
+}
+
+.empty-state i{
+    font-size:60px;
+    color:#cbd5e1;
+    margin-bottom:15px;
+}
+
+.empty-state h3{
+    color:#334155;
+    margin-bottom:10px;
+}
+
+.empty-state p{
+    color:#64748b;
+}
+
+@media(max-width:768px){
+
+    .timeline-item{
+        flex-direction:column;
+        align-items:flex-start;
+    }
+
+    .timeline-left{
+        width:100%;
+    }
+
+}
+</style>
+
+<!-- Header -->
+<section class="calendar-header">
+
+    <div class="calendar-title">
+        <h1>Project Calendar</h1>
+        <p>
+            Track upcoming deadlines and project schedules.
+        </p>
+    </div>
+
+    <div class="calendar-badge">
+        Scheduled Tasks: {{ tasks|length }}
+    </div>
+
+</section>
+
+<!-- Calendar Timeline -->
+<section class="calendar-card">
+
+{% if tasks %}
+
+    <div class="timeline-list">
+
+    {% for task in tasks %}
+
+        <div class="timeline-item">
+
+            <div class="timeline-left">
+
+                <div class="date-circle">
+                    <div class="date-day">
+                        {{ task.deadline|date:"d" }}
+                    </div>
+                    <div class="date-month">
+                        {{ task.deadline|date:"M" }}
+                    </div>
+                </div>
+
+                <div>
+
+                    <div class="task-title">
+                        <a href="{% url 'task-detail' task.pk %}">
+                            {{ task.title }}
+                        </a>
+                    </div>
+
+                    <div class="project-name">
+                        {{ task.project.name }}
+                    </div>
+
+                    <small style="color:#94a3b8;">
+                        Deadline:
+                        {{ task.deadline }}
+                    </small>
+
+                </div>
+
+            </div>
+
+            <div>
+
+                {% if task.status == 'completed' %}
+                    <span class="status-badge status-completed">
+                        Completed
+                    </span>
+
+                {% elif task.status == 'in_progress' %}
+                    <span class="status-badge status-progress">
+                        In Progress
+                    </span>
+
+                {% elif task.status == 'delayed' %}
+                    <span class="status-badge status-delayed">
+                        Delayed
+                    </span>
+
+                {% else %}
+                    <span class="status-badge status-pending">
+                        {{ task.get_status_display }}
+                    </span>
+                {% endif %}
+
+            </div>
+
+        </div>
+
+    {% endfor %}
+
+    </div>
+
+{% else %}
+
+    <div class="empty-state">
+
+        <i class="fa-solid fa-calendar-days"></i>
+
+        <h3>No Scheduled Tasks</h3>
+
+        <p>
+            Upcoming deadlines and planned tasks will appear here.
+        </p>
+
+    </div>
+
+{% endif %}
+
+</section>

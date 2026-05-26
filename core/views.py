@@ -3,10 +3,9 @@ from django.contrib.auth import views as auth_views
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
-from django.db.models import Sum
-from django.http import HttpResponseRedirect
+from django.db.models import Count, Q, Sum
 from django.shortcuts import get_object_or_404, redirect
-from django.urls import reverse_lazy
+from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 from django.views import View
 from django.views.generic import CreateView, DetailView, ListView, TemplateView, UpdateView
@@ -15,11 +14,9 @@ from .forms import (
     EmployeeForm,
     LeaveApprovalForm,
     LeaveRequestForm,
-    MilestoneForm,
     PerformanceReviewForm,
     ProfileForm,
     ProjectForm,
-    RecurringTaskForm,
     TaskApprovalForm,
     TaskAttachmentForm,
     TaskCommentForm,
@@ -30,63 +27,127 @@ from .forms import (
     UserAdminEditForm,
     UserAccountForm,
 )
-from .models import (
-    AuditLog,
-    Employee,
-    LeaveRequest,
-    Milestone,
-    Notification,
-    PerformanceMetric,
-    PerformanceReview,
-    Project,
-    RecurringTask,
-    Task,
-    TaskAttachment,
-    TaskComment,
-    TaskLog,
-    Team,
-    UserProfile,
-)
+from .models import Activity, AppRole, Attachment, Employee, Project, Request, Task, TaskLog, Team, current_user_role
 from .services import (
+    create_activity,
     create_audit_log,
     create_notification,
     dashboard_summary,
+    employee_metrics,
+    employee_ai_profile,
     predict_delay_risk,
     predict_task_completion_hours,
-    productivity_trend,
+    project_ai_summary,
     recommend_employee_for_task,
-    refresh_performance_metrics,
     send_credentials_email,
     skill_gap_analysis,
     sync_project_status,
+    task_anomaly_analysis,
+    team_health_summary,
     upsert_ai_result,
 )
 
 
-def current_user_role(user):
-    profile = getattr(user, 'profile', None)
-    if user.is_superuser:
-        return UserProfile.Role.ADMIN
-    return getattr(profile, 'role', None)
+def get_employee_for_user(user):
+    return getattr(user, 'employee_profile', None)
+
+
+def get_visible_teams(user):
+    role = current_user_role(user)
+    if role == AppRole.ADMIN:
+        return Team.objects.select_related('manager').all()
+    if role == AppRole.MANAGER:
+        return Team.objects.select_related('manager').filter(manager=user)
+    employee = get_employee_for_user(user)
+    if employee and employee.team_id:
+        return Team.objects.select_related('manager').filter(pk=employee.team_id)
+    return Team.objects.none()
+
+
+def get_visible_employees(user):
+    role = current_user_role(user)
+    queryset = Employee.objects.select_related('user', 'team')
+    if role == AppRole.ADMIN:
+        return queryset.all()
+    if role == AppRole.MANAGER:
+        return queryset.filter(team__manager=user)
+    employee = get_employee_for_user(user)
+    if employee:
+        return queryset.filter(pk=employee.pk)
+    return queryset.none()
+
+
+def get_visible_projects(user):
+    role = current_user_role(user)
+    queryset = Project.objects.select_related('team', 'team__manager')
+    if role == AppRole.ADMIN:
+        return queryset.all()
+    if role == AppRole.MANAGER:
+        return queryset.filter(team__manager=user)
+    employee = get_employee_for_user(user)
+    if employee and employee.team_id:
+        return queryset.filter(team=employee.team)
+    return queryset.none()
+
+
+def get_visible_tasks(user):
+    role = current_user_role(user)
+    queryset = Task.objects.select_related('project', 'project__team', 'assigned_to', 'assigned_to__user')
+    if role == AppRole.ADMIN:
+        return queryset.all()
+    if role == AppRole.MANAGER:
+        return queryset.filter(project__team__manager=user)
+    employee = get_employee_for_user(user)
+    if employee:
+        return queryset.filter(assigned_to=employee)
+    return queryset.none()
+
+
+def get_visible_requests(user):
+    role = current_user_role(user)
+    queryset = Request.objects.select_related('employee', 'employee__team', 'task', 'raised_by', 'reviewed_by')
+    if role == AppRole.ADMIN:
+        return queryset.all()
+    if role == AppRole.MANAGER:
+        return queryset.filter(Q(employee__team__manager=user) | Q(task__project__team__manager=user))
+    employee = get_employee_for_user(user)
+    if employee:
+        return queryset.filter(employee=employee)
+    return queryset.none()
+
+
+def get_visible_activities(user):
+    role = current_user_role(user)
+    queryset = Activity.objects.select_related('user', 'task', 'project')
+    if role == AppRole.ADMIN:
+        return queryset.all()
+    if role == AppRole.MANAGER:
+        return queryset.filter(Q(project__team__manager=user) | Q(task__project__team__manager=user) | Q(user=user))
+    employee = get_employee_for_user(user)
+    task_filter = Q()
+    if employee:
+        task_filter = Q(task__assigned_to=employee)
+    return queryset.filter(task_filter | Q(user=user))
 
 
 class RoleTemplateMixin:
     role_template_map = {
-        UserProfile.Role.ADMIN: 'admin',
-        UserProfile.Role.MANAGER: 'manager',
-        UserProfile.Role.EMPLOYEE: 'employee',
+        AppRole.ADMIN: 'admin',
+        AppRole.MANAGER: 'manager',
+        AppRole.EMPLOYEE: 'employee',
     }
 
     def get_template_names(self):
         names = list(super().get_template_names())
-        role = current_user_role(self.request.user)
-        role_dir = self.role_template_map.get(role)
+        role_dir = self.role_template_map.get(current_user_role(self.request.user))
         if not role_dir:
             return names
         role_specific = []
         for name in names:
             if name.startswith('core/'):
                 role_specific.append(f'{role_dir}/{name.split("/", 1)[1]}')
+            else:
+                role_specific.append(name)
         return role_specific or names
 
 
@@ -94,8 +155,6 @@ class RoleRequiredMixin(RoleTemplateMixin, LoginRequiredMixin):
     allowed_roles: tuple[str, ...] = ()
 
     def dispatch(self, request, *args, **kwargs):
-        if request.user.is_superuser:
-            return super().dispatch(request, *args, **kwargs)
         role = current_user_role(request.user)
         if self.allowed_roles and role not in self.allowed_roles:
             raise PermissionDenied('You do not have permission to access this page.')
@@ -117,69 +176,64 @@ class RolePasswordChangeDoneView(RoleTemplateMixin, auth_views.PasswordChangeDon
     pass
 
 
-def _sync_task_completion(task: Task) -> None:
-    if task.status == Task.Status.COMPLETED and task.completed_at is None:
-        task.completed_at = timezone.now()
-    elif task.status != Task.Status.COMPLETED:
-        task.completed_at = None
-
-
 class DashboardView(RoleLoginRequiredMixin, TemplateView):
     template_name = 'core/dashboard.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        profile = getattr(self.request.user, 'profile', None)
-        role = UserProfile.Role.ADMIN if self.request.user.is_superuser else getattr(profile, 'role', 'unassigned')
-        context['dashboard_role'] = role
-        context['recent_logs'] = TaskLog.objects.select_related('task', 'employee')[:8]
-        context['notifications'] = Notification.objects.filter(recipient=self.request.user)[:6]
+        role = current_user_role(self.request.user)
+        visible_tasks = get_visible_tasks(self.request.user)
+        visible_projects = get_visible_projects(self.request.user)
+        visible_requests = get_visible_requests(self.request.user)
+        notifications = get_visible_activities(self.request.user).filter(activity_type=Activity.Type.NOTIFICATION)[:6]
 
-        if role == UserProfile.Role.ADMIN:
+        context.update(
+            {
+                'dashboard_role': role,
+                'notifications': notifications,
+                'recent_tasks': visible_tasks[:6],
+                'recent_requests': visible_requests[:6],
+            }
+        )
+
+        if role == AppRole.ADMIN:
             context.update(dashboard_summary())
-            context['approval_queue'] = Task.objects.filter(approval_status=Task.ApprovalStatus.PENDING).select_related('project', 'assigned_to')[:6]
-        elif role == UserProfile.Role.MANAGER:
-            managed_teams = Team.objects.filter(manager=self.request.user)
-            managed_projects = Project.objects.filter(team__manager=self.request.user).select_related('team')
-            managed_tasks = Task.objects.filter(project__team__manager=self.request.user).select_related('project', 'assigned_to')
-            risk_rows = []
-            for task in managed_tasks.exclude(status=Task.Status.COMPLETED):
-                risk = predict_delay_risk(task)
-                if risk['label'] in {'High', 'Medium'}:
-                    risk_rows.append((task, risk))
-
+            context['teams'] = get_visible_teams(self.request.user)[:6]
+        elif role == AppRole.MANAGER:
+            employees = list(get_visible_employees(self.request.user))
+            employee_rows = [(employee, employee_metrics(employee)) for employee in employees]
+            managed_projects = list(visible_projects[:6])
             context.update(
                 {
-                    'managed_teams': managed_teams,
+                    'managed_teams': get_visible_teams(self.request.user),
                     'managed_projects': managed_projects,
-                    'team_members': Employee.objects.filter(team__manager=self.request.user).select_related('team'),
-                    'managed_tasks': managed_tasks[:8],
-                    'pending_approvals': managed_tasks.filter(approval_status=Task.ApprovalStatus.PENDING)[:6],
-                    'team_leave_requests': LeaveRequest.objects.filter(employee__team__manager=self.request.user)[:5],
-                    'manager_risks': risk_rows[:5],
-                    'burnout_alerts': PerformanceMetric.objects.select_related('employee').filter(
-                        employee__team__manager=self.request.user
-                    ).exclude(burnout_risk='Low'),
+                    'team_members': employees,
+                    'team_summary': employee_rows[:6],
+                    'team_health_rows': [team_health_summary(team) for team in get_visible_teams(self.request.user)],
+                    'managed_project_ai': [project_ai_summary(project) for project in managed_projects],
+                    'pending_approvals': visible_requests.filter(
+                        request_type=Request.Type.TASK_APPROVAL,
+                        status=Request.Status.PENDING,
+                    )[:6],
+                    'team_leave_requests': visible_requests.filter(request_type=Request.Type.LEAVE)[:5],
                 }
             )
-        elif role == UserProfile.Role.EMPLOYEE:
-            employee = getattr(self.request.user, 'employee_profile', None)
-            if employee:
-                my_tasks = Task.objects.filter(assigned_to=employee).select_related('project').order_by('deadline')
-                context.update(
-                    {
-                        'employee_record': employee,
-                        'my_tasks': my_tasks,
-                        'my_due_soon': my_tasks.exclude(status=Task.Status.COMPLETED)[:5],
-                        'my_completed_tasks': my_tasks.filter(status=Task.Status.COMPLETED).count(),
-                        'my_pending_tasks': my_tasks.exclude(status=Task.Status.COMPLETED).count(),
-                        'my_logs': TaskLog.objects.filter(employee=employee).select_related('task')[:8],
-                        'my_ai_results': [upsert_ai_result(task) for task in my_tasks[:5]],
-                        'my_metric': getattr(employee, 'performance_metric', None),
-                    }
-                )
-            else:
-                context['employee_record'] = None
+        else:
+            employee = get_employee_for_user(self.request.user)
+            my_tasks = visible_tasks.order_by('deadline')
+            context.update(
+                {
+                    'employee_record': employee,
+                    'my_tasks': my_tasks,
+                    'my_due_soon': my_tasks.exclude(status=Task.Status.COMPLETED)[:5],
+                    'my_completed_tasks': my_tasks.filter(status=Task.Status.COMPLETED).count(),
+                    'my_pending_tasks': my_tasks.exclude(status=Task.Status.COMPLETED).count(),
+                    'my_logs': TaskLog.objects.filter(employee=employee).select_related('task')[:8] if employee else [],
+                    'my_ai_results': [upsert_ai_result(task) for task in my_tasks[:5]],
+                    'my_metric': employee_metrics(employee) if employee else None,
+                    'my_ai_profile': employee_ai_profile(employee) if employee else None,
+                }
+            )
         return context
 
 
@@ -201,18 +255,18 @@ class ProfileUpdateView(RoleLoginRequiredMixin, UpdateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['profile_user'] = self.request.user
-        context['profile_employee'] = getattr(self.request.user, 'employee_profile', None)
+        context['profile_employee'] = get_employee_for_user(self.request.user)
         return context
 
 
 class UserListView(RoleRequiredMixin, ListView):
-    allowed_roles = (UserProfile.Role.ADMIN,)
+    allowed_roles = (AppRole.ADMIN,)
     model = User
     template_name = 'core/user_list.html'
     context_object_name = 'users'
 
     def get_queryset(self):
-        return User.objects.select_related('profile').order_by('username')
+        return User.objects.prefetch_related('groups').order_by('username')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -221,7 +275,7 @@ class UserListView(RoleRequiredMixin, ListView):
                 'id': account.id,
                 'username': account.username,
                 'email': account.email,
-                'role': getattr(getattr(account, 'profile', None), 'role', 'unassigned'),
+                'role': current_user_role(account),
                 'is_staff': account.is_staff,
                 'is_active': account.is_active,
             }
@@ -231,7 +285,7 @@ class UserListView(RoleRequiredMixin, ListView):
 
 
 class UserCreateView(RoleRequiredMixin, CreateView):
-    allowed_roles = (UserProfile.Role.ADMIN,)
+    allowed_roles = (AppRole.ADMIN,)
     model = User
     form_class = UserAccountForm
     template_name = 'core/form.html'
@@ -251,7 +305,7 @@ class UserCreateView(RoleRequiredMixin, CreateView):
 
 
 class UserAdminUpdateView(RoleRequiredMixin, UpdateView):
-    allowed_roles = (UserProfile.Role.ADMIN,)
+    allowed_roles = (AppRole.ADMIN,)
     model = User
     form_class = UserAdminEditForm
     template_name = 'core/form.html'
@@ -265,26 +319,43 @@ class UserAdminUpdateView(RoleRequiredMixin, UpdateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = 'Admin Actions: Edit User'
+        context['title'] = 'Edit User'
         return context
 
 
-class TeamListView(RoleLoginRequiredMixin, ListView):
-    model = Team
+class UserToggleActiveView(RoleRequiredMixin, View):
+    allowed_roles = (AppRole.ADMIN,)
+
+    def post(self, request, *args, **kwargs):
+        user = get_object_or_404(User, pk=kwargs['pk'])
+        user.is_active = not user.is_active
+        user.save(update_fields=['is_active'])
+        create_audit_log(request.user, 'toggled_user_active', 'User', user.id, user.username)
+        messages.success(request, f'{user.username} is now {"active" if user.is_active else "inactive"}.')
+        return redirect('user-list')
+
+
+class TeamListView(RoleRequiredMixin, ListView):
+    allowed_roles = (AppRole.ADMIN, AppRole.MANAGER)
     template_name = 'core/team_list.html'
     context_object_name = 'teams'
 
+    def get_queryset(self):
+        return get_visible_teams(self.request.user)
+
 
 class TeamCreateView(RoleRequiredMixin, CreateView):
-    allowed_roles = (UserProfile.Role.ADMIN,)
+    allowed_roles = (AppRole.ADMIN,)
     model = Team
     form_class = TeamForm
     template_name = 'core/form.html'
     success_url = reverse_lazy('team-list')
 
     def form_valid(self, form):
+        team = form.save()
+        create_audit_log(self.request.user, 'created_team', 'Team', team.id, team.name)
         messages.success(self.request, 'Team created successfully.')
-        return super().form_valid(form)
+        return redirect(self.success_url)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -293,43 +364,35 @@ class TeamCreateView(RoleRequiredMixin, CreateView):
 
 
 class TeamUpdateView(RoleRequiredMixin, UpdateView):
-    allowed_roles = (UserProfile.Role.ADMIN,)
+    allowed_roles = (AppRole.ADMIN,)
     model = Team
     form_class = TeamForm
     template_name = 'core/form.html'
     success_url = reverse_lazy('team-list')
 
     def form_valid(self, form):
-        response = super().form_valid(form)
-        create_audit_log(self.request.user, 'updated_team', 'Team', self.object.id, self.object.name)
+        team = form.save()
+        create_audit_log(self.request.user, 'updated_team', 'Team', team.id, team.name)
         messages.success(self.request, 'Team updated successfully.')
-        return response
+        return redirect(self.success_url)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = 'Admin Actions: Edit Team'
+        context['title'] = 'Edit Team'
         return context
 
 
-class EmployeeListView(RoleLoginRequiredMixin, ListView):
-    model = Employee
+class EmployeeListView(RoleRequiredMixin, ListView):
+    allowed_roles = (AppRole.ADMIN, AppRole.MANAGER, AppRole.EMPLOYEE)
     template_name = 'core/employee_list.html'
     context_object_name = 'employees'
 
     def get_queryset(self):
-        queryset = Employee.objects.select_related('team', 'user').order_by('name')
-        profile = getattr(self.request.user, 'profile', None)
-        role = UserProfile.Role.ADMIN if self.request.user.is_superuser else getattr(profile, 'role', None)
-        if role == UserProfile.Role.MANAGER:
-            queryset = queryset.filter(team__manager=self.request.user)
-        elif role == UserProfile.Role.EMPLOYEE:
-            employee = getattr(self.request.user, 'employee_profile', None)
-            queryset = queryset.filter(pk=employee.pk) if employee else queryset.none()
-        return queryset
+        return get_visible_employees(self.request.user)
 
 
 class EmployeeCreateView(RoleRequiredMixin, CreateView):
-    allowed_roles = (UserProfile.Role.ADMIN,)
+    allowed_roles = (AppRole.ADMIN,)
     model = Employee
     form_class = EmployeeForm
     template_name = 'core/form.html'
@@ -337,23 +400,20 @@ class EmployeeCreateView(RoleRequiredMixin, CreateView):
 
     def form_valid(self, form):
         employee = form.save()
-        if employee.user:
-            UserProfile.objects.update_or_create(user=employee.user, defaults={'role': UserProfile.Role.EMPLOYEE})
-        if getattr(employee, 'created_user', None):
-            send_credentials_email(employee.email, employee.created_user.username, employee.created_password, 'employee')
+        if employee.created_user:
+            send_credentials_email(employee.email, employee.created_user.username, employee.created_password, AppRole.EMPLOYEE)
         create_audit_log(self.request.user, 'created_employee', 'Employee', employee.id, employee.name)
-        messages.success(self.request, 'Employee added successfully.')
-        refresh_performance_metrics()
+        messages.success(self.request, 'Employee created successfully.')
         return redirect(self.success_url)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = 'Add Employee'
+        context['title'] = 'Create Employee'
         return context
 
 
 class EmployeeUpdateView(RoleRequiredMixin, UpdateView):
-    allowed_roles = (UserProfile.Role.ADMIN,)
+    allowed_roles = (AppRole.ADMIN,)
     model = Employee
     form_class = EmployeeForm
     template_name = 'core/form.html'
@@ -363,34 +423,35 @@ class EmployeeUpdateView(RoleRequiredMixin, UpdateView):
         employee = form.save()
         create_audit_log(self.request.user, 'updated_employee', 'Employee', employee.id, employee.name)
         messages.success(self.request, 'Employee updated successfully.')
-        refresh_performance_metrics()
         return redirect(self.success_url)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = 'Admin Actions: Edit Employee'
+        context['title'] = 'Edit Employee'
         return context
 
 
-class ProjectListView(RoleLoginRequiredMixin, ListView):
-    model = Project
+class ProjectListView(RoleRequiredMixin, ListView):
+    allowed_roles = (AppRole.ADMIN, AppRole.MANAGER, AppRole.EMPLOYEE)
     template_name = 'core/project_list.html'
     context_object_name = 'projects'
 
     def get_queryset(self):
-        return Project.objects.select_related('team').order_by('deadline', 'name')
+        return get_visible_projects(self.request.user)
 
 
 class ProjectCreateView(RoleRequiredMixin, CreateView):
-    allowed_roles = (UserProfile.Role.ADMIN,)
+    allowed_roles = (AppRole.ADMIN,)
     model = Project
     form_class = ProjectForm
     template_name = 'core/form.html'
     success_url = reverse_lazy('project-list')
 
     def form_valid(self, form):
+        project = form.save()
+        create_audit_log(self.request.user, 'created_project', 'Project', project.id, project.name)
         messages.success(self.request, 'Project created successfully.')
-        return super().form_valid(form)
+        return redirect(self.success_url)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -399,163 +460,51 @@ class ProjectCreateView(RoleRequiredMixin, CreateView):
 
 
 class ProjectUpdateView(RoleRequiredMixin, UpdateView):
-    allowed_roles = (UserProfile.Role.ADMIN,)
+    allowed_roles = (AppRole.ADMIN,)
     model = Project
     form_class = ProjectForm
     template_name = 'core/form.html'
     success_url = reverse_lazy('project-list')
 
     def form_valid(self, form):
-        response = super().form_valid(form)
-        create_audit_log(self.request.user, 'updated_project', 'Project', self.object.id, self.object.name)
+        project = form.save()
+        create_audit_log(self.request.user, 'updated_project', 'Project', project.id, project.name)
         messages.success(self.request, 'Project updated successfully.')
-        return response
+        return redirect(self.success_url)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = 'Admin Actions: Edit Project'
+        context['title'] = 'Edit Project'
         return context
 
 
-class MilestoneListView(RoleLoginRequiredMixin, ListView):
-    model = Milestone
-    template_name = 'core/milestone_list.html'
-    context_object_name = 'milestones'
-
-    def get_queryset(self):
-        queryset = Milestone.objects.select_related('project', 'project__team').order_by('deadline', 'name')
-        profile = getattr(self.request.user, 'profile', None)
-        role = UserProfile.Role.ADMIN if self.request.user.is_superuser else getattr(profile, 'role', None)
-        if role == UserProfile.Role.MANAGER:
-            queryset = queryset.filter(project__team__manager=self.request.user)
-        elif role == UserProfile.Role.EMPLOYEE:
-            employee = getattr(self.request.user, 'employee_profile', None)
-            queryset = queryset.filter(tasks__assigned_to=employee).distinct() if employee else queryset.none()
-        return queryset
-
-
-class PlanningHubView(RoleLoginRequiredMixin, TemplateView):
+class PlanningHubView(RoleRequiredMixin, TemplateView):
+    allowed_roles = (AppRole.ADMIN, AppRole.MANAGER, AppRole.EMPLOYEE)
     template_name = 'core/planning_hub.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        profile = getattr(self.request.user, 'profile', None)
-        role = UserProfile.Role.ADMIN if self.request.user.is_superuser else getattr(profile, 'role', None)
-
-        projects = Project.objects.select_related('team').order_by('deadline', 'name')
-        milestones = Milestone.objects.select_related('project', 'project__team').order_by('deadline')
-        recurring_tasks = RecurringTask.objects.select_related('project', 'assigned_to').order_by('next_due_date')
-        calendar_items = Task.objects.select_related('project', 'assigned_to').order_by('deadline')
-
-        if role == UserProfile.Role.MANAGER:
-            projects = projects.filter(team__manager=self.request.user)
-            milestones = milestones.filter(project__team__manager=self.request.user)
-            recurring_tasks = recurring_tasks.filter(project__team__manager=self.request.user)
-            calendar_items = calendar_items.filter(project__team__manager=self.request.user)
-        elif role == UserProfile.Role.EMPLOYEE:
-            employee = getattr(self.request.user, 'employee_profile', None)
-            projects = projects.filter(tasks__assigned_to=employee).distinct() if employee else projects.none()
-            milestones = milestones.filter(tasks__assigned_to=employee).distinct() if employee else milestones.none()
-            recurring_tasks = recurring_tasks.filter(assigned_to=employee) if employee else recurring_tasks.none()
-            calendar_items = calendar_items.filter(assigned_to=employee) if employee else calendar_items.none()
-
+        tasks = get_visible_tasks(self.request.user)
         context.update(
             {
-                'planning_role': role,
-                'planning_projects': projects[:6],
-                'planning_milestones': milestones[:6],
-                'planning_recurring_tasks': recurring_tasks[:6],
-                'planning_calendar_items': calendar_items[:8],
+                'upcoming_tasks': tasks.exclude(status=Task.Status.COMPLETED).order_by('deadline')[:10],
+                'upcoming_projects': get_visible_projects(self.request.user).exclude(status=Project.Status.COMPLETED)[:8],
+                'today': timezone.localdate(),
             }
         )
         return context
 
 
-class MilestoneCreateView(RoleRequiredMixin, CreateView):
-    allowed_roles = (UserProfile.Role.ADMIN, UserProfile.Role.MANAGER)
-    model = Milestone
-    form_class = MilestoneForm
-    template_name = 'core/form.html'
-    success_url = reverse_lazy('milestone-list')
-
-    def get_form(self, form_class=None):
-        form = super().get_form(form_class)
-        if not self.request.user.is_superuser:
-            form.fields['project'].queryset = Project.objects.filter(team__manager=self.request.user)
-        return form
-
-    def form_valid(self, form):
-        response = super().form_valid(form)
-        create_audit_log(self.request.user, 'created_milestone', 'Milestone', self.object.id, self.object.name)
-        messages.success(self.request, 'Milestone created successfully.')
-        return response
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['title'] = 'Create Milestone'
-        return context
-
-
-class RecurringTaskListView(RoleLoginRequiredMixin, ListView):
-    model = RecurringTask
-    template_name = 'core/recurring_task_list.html'
-    context_object_name = 'recurring_tasks'
-
-    def get_queryset(self):
-        queryset = RecurringTask.objects.select_related('project', 'assigned_to', 'project__team')
-        profile = getattr(self.request.user, 'profile', None)
-        role = UserProfile.Role.ADMIN if self.request.user.is_superuser else getattr(profile, 'role', None)
-        if role == UserProfile.Role.MANAGER:
-            queryset = queryset.filter(project__team__manager=self.request.user)
-        elif role == UserProfile.Role.EMPLOYEE:
-            employee = getattr(self.request.user, 'employee_profile', None)
-            queryset = queryset.filter(assigned_to=employee) if employee else queryset.none()
-        return queryset
-
-
-class RecurringTaskCreateView(RoleRequiredMixin, CreateView):
-    allowed_roles = (UserProfile.Role.ADMIN, UserProfile.Role.MANAGER)
-    model = RecurringTask
-    form_class = RecurringTaskForm
-    template_name = 'core/form.html'
-    success_url = reverse_lazy('recurring-task-list')
-
-    def get_form(self, form_class=None):
-        form = super().get_form(form_class)
-        if not self.request.user.is_superuser:
-            form.fields['project'].queryset = Project.objects.filter(team__manager=self.request.user)
-            form.fields['assigned_to'].queryset = Employee.objects.filter(team__manager=self.request.user)
-        return form
-
-    def form_valid(self, form):
-        response = super().form_valid(form)
-        create_audit_log(self.request.user, 'created_recurring_task', 'RecurringTask', self.object.id, self.object.title)
-        messages.success(self.request, 'Recurring task saved successfully.')
-        return response
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['title'] = 'Create Recurring Task'
-        return context
-
-
-class TaskListView(RoleLoginRequiredMixin, ListView):
-    model = Task
+class TaskListView(RoleRequiredMixin, ListView):
+    allowed_roles = (AppRole.ADMIN, AppRole.MANAGER, AppRole.EMPLOYEE)
     template_name = 'core/task_list.html'
     context_object_name = 'tasks'
 
     def get_queryset(self):
-        queryset = Task.objects.select_related('project', 'assigned_to', 'project__team').order_by('deadline', 'title')
-        profile = getattr(self.request.user, 'profile', None)
-        role = UserProfile.Role.ADMIN if self.request.user.is_superuser else getattr(profile, 'role', None)
+        queryset = get_visible_tasks(self.request.user)
         project_id = self.request.GET.get('project')
         assignment = self.request.GET.get('assignment')
-
-        if role == UserProfile.Role.MANAGER:
-            queryset = queryset.filter(project__team__manager=self.request.user)
-        elif role == UserProfile.Role.EMPLOYEE:
-            employee = getattr(self.request.user, 'employee_profile', None)
-            queryset = queryset.filter(assigned_to=employee) if employee else queryset.none()
+        status = self.request.GET.get('status')
 
         if project_id:
             queryset = queryset.filter(project_id=project_id)
@@ -563,85 +512,53 @@ class TaskListView(RoleLoginRequiredMixin, ListView):
             queryset = queryset.filter(assigned_to__isnull=False)
         elif assignment == 'unassigned':
             queryset = queryset.filter(assigned_to__isnull=True)
+        if status:
+            queryset = queryset.filter(status=status)
         return queryset
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        profile = getattr(self.request.user, 'profile', None)
-        role = UserProfile.Role.ADMIN if self.request.user.is_superuser else getattr(profile, 'role', None)
-        context['task_scope_label'] = (
-            'All Tasks' if role == UserProfile.Role.ADMIN else
-            'Team Tasks' if role == UserProfile.Role.MANAGER else
-            'My Tasks'
-        )
-        project_queryset = Project.objects.select_related('team').order_by('name')
-        if role == UserProfile.Role.MANAGER:
-            project_queryset = project_queryset.filter(team__manager=self.request.user)
-        elif role == UserProfile.Role.EMPLOYEE:
-            employee = getattr(self.request.user, 'employee_profile', None)
-            project_queryset = project_queryset.filter(tasks__assigned_to=employee).distinct() if employee else project_queryset.none()
-        context['project_filters'] = project_queryset
-        context['selected_project'] = self.request.GET.get('project', '')
-        context['selected_assignment'] = self.request.GET.get('assignment', '')
+        context['projects'] = get_visible_projects(self.request.user)
+        context['current_role'] = current_user_role(self.request.user)
+        context['filters'] = {
+            'project': self.request.GET.get('project', ''),
+            'assignment': self.request.GET.get('assignment', ''),
+            'status': self.request.GET.get('status', ''),
+        }
         return context
 
 
-class ApprovalQueueView(RoleRequiredMixin, TemplateView):
-    allowed_roles = (UserProfile.Role.ADMIN, UserProfile.Role.MANAGER)
-    template_name = 'core/approval_queue.html'
+class KanbanBoardView(TaskListView):
+    template_name = 'core/kanban.html'
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        tasks = Task.objects.select_related('project', 'assigned_to', 'project__team').filter(
-            approval_status=Task.ApprovalStatus.PENDING
-        )
-        leave_requests = LeaveRequest.objects.select_related('employee', 'employee__team').filter(
-            status=LeaveRequest.Status.PENDING
-        )
-        if not self.request.user.is_superuser:
-            tasks = tasks.filter(project__team__manager=self.request.user)
-            leave_requests = leave_requests.filter(employee__team__manager=self.request.user)
-        context['approval_tasks'] = tasks
-        context['leave_requests'] = leave_requests
-        return context
+
+class CalendarView(TaskListView):
+    template_name = 'core/calendar.html'
 
 
 class TaskCreateView(RoleRequiredMixin, CreateView):
-    allowed_roles = (UserProfile.Role.ADMIN, UserProfile.Role.MANAGER)
+    allowed_roles = (AppRole.ADMIN, AppRole.MANAGER)
     model = Task
     form_class = TaskForm
     template_name = 'core/form.html'
-    success_url = reverse_lazy('task-list')
 
     def get_form(self, form_class=None):
         form = super().get_form(form_class)
-        if not self.request.user.is_superuser:
-            form.fields['project'].queryset = Project.objects.filter(team__manager=self.request.user)
-            form.fields['milestone'].queryset = Milestone.objects.filter(project__team__manager=self.request.user)
-            form.fields['assigned_to'].queryset = Employee.objects.filter(team__manager=self.request.user)
+        if current_user_role(self.request.user) == AppRole.MANAGER:
+            form.fields['project'].queryset = get_visible_projects(self.request.user)
+            form.fields['assigned_to'].queryset = get_visible_employees(self.request.user)
         return form
 
     def form_valid(self, form):
         task = form.save(commit=False)
         task.created_by = self.request.user
-        if task.requires_approval and task.status == Task.Status.COMPLETED:
-            task.status = Task.Status.SUBMITTED
-            task.approval_status = Task.ApprovalStatus.PENDING
-        _sync_task_completion(task)
         task.save()
         sync_project_status(task.project)
-        upsert_ai_result(task)
         create_audit_log(self.request.user, 'created_task', 'Task', task.id, task.title)
         if task.assigned_to and task.assigned_to.user:
-            create_notification(
-                task.assigned_to.user,
-                'New task assigned',
-                f'You have been assigned "{task.title}". Deadline: {task.deadline}.',
-                Notification.Kind.TASK,
-            )
+            create_notification(task.assigned_to.user, 'New task assigned', f'{task.title} has been assigned to you.')
         messages.success(self.request, 'Task created successfully.')
-        refresh_performance_metrics()
-        return redirect(self.success_url)
+        return redirect('task-detail', pk=task.pk)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -649,399 +566,297 @@ class TaskCreateView(RoleRequiredMixin, CreateView):
         return context
 
 
-class TaskUpdateView(RoleRequiredMixin, UpdateView):
-    allowed_roles = (UserProfile.Role.ADMIN, UserProfile.Role.MANAGER, UserProfile.Role.EMPLOYEE)
-    model = Task
-    form_class = TaskUpdateForm
-    template_name = 'core/form.html'
-    success_url = reverse_lazy('task-list')
-
-    def dispatch(self, request, *args, **kwargs):
-        task = self.get_object()
-        profile = getattr(request.user, 'profile', None)
-        role = UserProfile.Role.ADMIN if request.user.is_superuser else getattr(profile, 'role', None)
-        employee = getattr(request.user, 'employee_profile', None)
-
-        if role == UserProfile.Role.EMPLOYEE and task.assigned_to != employee:
-            raise PermissionDenied('You can only update your own assigned tasks.')
-        if role == UserProfile.Role.MANAGER and task.project and task.project.team.manager != request.user:
-            raise PermissionDenied('You can only update tasks from your team.')
-        return super().dispatch(request, *args, **kwargs)
-
-    def get_form(self, form_class=None):
-        form = super().get_form(form_class)
-        if not self.request.user.is_superuser:
-            form.fields['project'].queryset = Project.objects.filter(team__manager=self.request.user)
-            form.fields['milestone'].queryset = Milestone.objects.filter(project__team__manager=self.request.user)
-            form.fields['assigned_to'].queryset = Employee.objects.filter(team__manager=self.request.user)
-        return form
-
-    def form_valid(self, form):
-        previous_project = self.get_object().project
-        task = form.save(commit=False)
-        if task.requires_approval and task.status == Task.Status.COMPLETED:
-            task.status = Task.Status.SUBMITTED
-            task.approval_status = Task.ApprovalStatus.PENDING
-        _sync_task_completion(task)
-        task.save()
-        sync_project_status(previous_project)
-        sync_project_status(task.project)
-        upsert_ai_result(task)
-        create_audit_log(self.request.user, 'updated_task', 'Task', task.id, task.title)
-        messages.success(self.request, 'Task updated successfully.')
-        refresh_performance_metrics()
-        return redirect('task-detail', pk=task.pk)
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['title'] = 'Update Task'
-        return context
-
-
-class TaskDetailView(RoleLoginRequiredMixin, DetailView):
+class TaskDetailView(RoleRequiredMixin, DetailView):
+    allowed_roles = (AppRole.ADMIN, AppRole.MANAGER, AppRole.EMPLOYEE)
     model = Task
     template_name = 'core/task_detail.html'
     context_object_name = 'task'
 
-    def dispatch(self, request, *args, **kwargs):
-        task = self.get_object()
-        profile = getattr(request.user, 'profile', None)
-        role = UserProfile.Role.ADMIN if request.user.is_superuser else getattr(profile, 'role', None)
-        employee = getattr(request.user, 'employee_profile', None)
-
-        if role == UserProfile.Role.EMPLOYEE and task.assigned_to != employee:
-            raise PermissionDenied('You can only view your own assigned tasks.')
-        if role == UserProfile.Role.MANAGER and task.project and task.project.team.manager != request.user:
-            raise PermissionDenied('You can only view tasks from your team.')
-        return super().dispatch(request, *args, **kwargs)
+    def get_queryset(self):
+        return get_visible_tasks(self.request.user)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         task = self.object
-        viewer_employee = getattr(self.request.user, 'employee_profile', None)
-        ai_result = upsert_ai_result(task)
-        skill_gap = skill_gap_analysis(task)
-        context['total_logged_hours'] = task.logs.aggregate(total=Sum('hours_spent'))['total'] or 0
-        context['predicted_completion_hours'] = predict_task_completion_hours(task)
-        context['delay_risk'] = predict_delay_risk(task)
-        context['allocation_suggestions'] = recommend_employee_for_task(task)
-        context['ai_result'] = ai_result
-        context['can_log_task'] = bool(viewer_employee and task.assigned_to_id == viewer_employee.id)
-        context['can_approve_task'] = bool(
-            task.project
-            and task.project.team
-            and task.project.team.manager_id == self.request.user.id
-            and task.approval_status == Task.ApprovalStatus.PENDING
+        context.update(
+            {
+                'ai_result': upsert_ai_result(task),
+                'delay_risk': predict_delay_risk(task),
+                'skill_gap': skill_gap_analysis(task),
+                'task_anomaly': task_anomaly_analysis(task),
+                'project_ai': project_ai_summary(task.project),
+                'employee_ai_profile': employee_ai_profile(task.assigned_to) if task.assigned_to else None,
+                'allocation_suggestions': [] if task.assigned_to else recommend_employee_for_task(task),
+                'comments': task.activities.filter(activity_type=Activity.Type.COMMENT),
+                'attachments': task.attachments.all(),
+                'logs': task.logs.select_related('employee')[:10],
+                'approval_request': task.latest_approval_request,
+            }
         )
-        context['comment_form'] = TaskCommentForm()
-        context['attachment_form'] = TaskAttachmentForm()
-        context['skill_gap'] = skill_gap
-        context['matched_skills'] = skill_gap['matched_skills']
-        context['missing_skills'] = skill_gap['missing_skills']
-        context['learning_recommendations'] = skill_gap['learning_recommendations']
-        context['comments'] = task.comments.select_related('author')
-        context['attachments'] = task.attachments.select_related('uploaded_by')
         return context
 
 
-class TaskCommentCreateView(LoginRequiredMixin, View):
-    def post(self, request, pk):
-        task = get_object_or_404(Task, pk=pk)
-        form = TaskCommentForm(request.POST)
-        if form.is_valid():
-            comment = form.save(commit=False)
-            comment.task = task
-            comment.author = request.user
-            comment.save()
-            create_audit_log(request.user, 'commented_task', 'Task', task.id, comment.body[:120])
-            messages.success(request, 'Comment added successfully.')
-        return redirect('task-detail', pk=pk)
-
-
-class TaskAttachmentCreateView(LoginRequiredMixin, View):
-    def post(self, request, pk):
-        task = get_object_or_404(Task, pk=pk)
-        form = TaskAttachmentForm(request.POST, request.FILES)
-        if form.is_valid():
-            attachment = form.save(commit=False)
-            attachment.task = task
-            attachment.uploaded_by = request.user
-            attachment.save()
-            create_audit_log(request.user, 'attached_file', 'Task', task.id, attachment.label)
-            messages.success(request, 'Attachment uploaded successfully.')
-        return redirect('task-detail', pk=pk)
-
-
-class TaskLogCreateView(RoleRequiredMixin, CreateView):
-    allowed_roles = (UserProfile.Role.ADMIN, UserProfile.Role.MANAGER, UserProfile.Role.EMPLOYEE)
-    model = TaskLog
-    form_class = TaskLogForm
-    template_name = 'core/form.html'
-    success_url = reverse_lazy('dashboard')
-
-    def _current_employee(self):
-        return getattr(self.request.user, 'employee_profile', None)
-
-    def dispatch(self, request, *args, **kwargs):
-        if self._current_employee() is None:
-            raise PermissionDenied('Only users with their own assigned employee profile can log work.')
-        return super().dispatch(request, *args, **kwargs)
-
-    def get_form_kwargs(self):
-        kwargs = super().get_form_kwargs()
-        profile = getattr(self.request.user, 'profile', None)
-        role = UserProfile.Role.ADMIN if self.request.user.is_superuser else getattr(profile, 'role', None)
-        employee = self._current_employee()
-        kwargs['role'] = role
-        kwargs['employee'] = employee
-        return kwargs
-
-    def get_initial(self):
-        initial = super().get_initial()
-        task_id = self.request.GET.get('task')
-        employee = self._current_employee()
-
-        if task_id:
-            task = get_object_or_404(Task, pk=task_id)
-            if employee is None or task.assigned_to != employee:
-                raise PermissionDenied('You can only log work for your own assigned tasks.')
-            initial['task'] = task
-            initial['employee'] = employee
-            initial['progress_after_log'] = task.progress
-        elif employee:
-            initial['employee'] = employee
-        return initial
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        selected_task = None
-        task_id = self.request.GET.get('task')
-        if task_id:
-            selected_task = get_object_or_404(Task, pk=task_id)
-        elif self.request.method == 'GET':
-            form_task = context['form'].initial.get('task')
-            selected_task = form_task if isinstance(form_task, Task) else None
-        context['title'] = 'Log Work'
-        context['selected_task'] = selected_task
-        context['current_progress'] = selected_task.progress if selected_task else None
-        return context
-
-    def form_valid(self, form):
-        employee = self._current_employee()
-        if employee is None:
-            raise PermissionDenied('Only the assigned employee can log work for a task.')
-        form.instance.employee = employee
-        if form.instance.task.assigned_to != employee:
-            raise PermissionDenied('You can only log work for your own assigned tasks.')
-        response = super().form_valid(form)
-        task = form.instance.task
-        task.progress = form.instance.progress_after_log
-        if task.progress >= 100:
-            if task.requires_approval:
-                task.status = Task.Status.SUBMITTED
-                task.approval_status = Task.ApprovalStatus.PENDING
-                if task.project and task.project.team and task.project.team.manager:
-                    create_notification(
-                        task.project.team.manager,
-                        'Task submitted for approval',
-                        f'"{task.title}" was submitted by {employee.name}.',
-                        Notification.Kind.APPROVAL,
-                    )
-            else:
-                task.status = Task.Status.COMPLETED
-                task.approval_status = Task.ApprovalStatus.APPROVED
-        elif task.progress > 0 and task.status == Task.Status.TODO:
-            task.status = Task.Status.IN_PROGRESS
-        _sync_task_completion(task)
-        task.save()
-        sync_project_status(task.project)
-        upsert_ai_result(task)
-        refresh_performance_metrics()
-        messages.success(self.request, 'Work log recorded successfully.')
-        return response
-
-
-class AnalyticsView(RoleLoginRequiredMixin, TemplateView):
-    template_name = 'core/analytics.html'
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        profile = getattr(self.request.user, 'profile', None)
-        role = UserProfile.Role.ADMIN if self.request.user.is_superuser else getattr(profile, 'role', None)
-        context['analytics_role'] = role
-
-        if role == UserProfile.Role.ADMIN:
-            summary = dashboard_summary()
-            context.update(summary)
-            context['metrics'] = PerformanceMetric.objects.select_related('employee', 'employee__team')
-            task_queryset = Task.objects.select_related('project', 'assigned_to').exclude(status=Task.Status.COMPLETED)
-        elif role == UserProfile.Role.MANAGER:
-            context['metrics'] = PerformanceMetric.objects.select_related('employee', 'employee__team').filter(
-                employee__team__manager=self.request.user
-            )
-            context['team_summary'] = [
-                item for item in dashboard_summary()['team_summary']
-                if item['team'].manager_id == self.request.user.id
-            ]
-            context['project_summary'] = [
-                item for item in dashboard_summary()['project_summary']
-                if item['project'].team.manager_id == self.request.user.id
-            ]
-            task_queryset = Task.objects.select_related('project', 'assigned_to').filter(
-                project__team__manager=self.request.user
-            ).exclude(status=Task.Status.COMPLETED)
-        else:
-            employee = getattr(self.request.user, 'employee_profile', None)
-            context['metrics'] = PerformanceMetric.objects.select_related('employee', 'employee__team').filter(
-                employee=employee
-            ) if employee else PerformanceMetric.objects.none()
-            context['team_summary'] = []
-            context['project_summary'] = []
-            task_queryset = Task.objects.select_related('project', 'assigned_to').filter(
-                assigned_to=employee
-            ).exclude(status=Task.Status.COMPLETED) if employee else Task.objects.none()
-
-        context['projects'] = Project.objects.select_related('team')
-        context['high_risk_tasks'] = []
-        for task in task_queryset:
-            risk = predict_delay_risk(task)
-            if risk['label'] in {'High', 'Medium'}:
-                context['high_risk_tasks'].append((task, risk))
-        context['trend_data'] = productivity_trend()
-        return context
-
-
-class KanbanBoardView(RoleLoginRequiredMixin, TemplateView):
-    template_name = 'core/kanban.html'
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        tasks = TaskListView()
-        tasks.request = self.request
-        queryset = tasks.get_queryset()
-        columns = [
-            (Task.Status.TODO, 'To Do'),
-            (Task.Status.IN_PROGRESS, 'In Progress'),
-            (Task.Status.SUBMITTED, 'Submitted'),
-            (Task.Status.REVIEW, 'Review'),
-            (Task.Status.COMPLETED, 'Completed'),
-            (Task.Status.BLOCKED, 'Blocked'),
-        ]
-        context['kanban_columns'] = [
-            {'status': status, 'label': label, 'tasks': queryset.filter(status=status)}
-            for status, label in columns
-        ]
-        return context
-
-
-class CalendarView(RoleLoginRequiredMixin, TemplateView):
-    template_name = 'core/calendar.html'
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        tasks = TaskListView()
-        tasks.request = self.request
-        queryset = tasks.get_queryset()
-        context['calendar_items'] = queryset.order_by('deadline')[:30]
-        return context
-
-
-class UserToggleActiveView(RoleRequiredMixin, View):
-    allowed_roles = (UserProfile.Role.ADMIN,)
-
-    def post(self, request, pk):
-        user = get_object_or_404(User, pk=pk)
-        if user == request.user:
-            messages.error(request, 'You cannot deactivate your own account here.')
-            return redirect('user-list')
-        user.is_active = not user.is_active
-        user.save(update_fields=['is_active'])
-        create_audit_log(request.user, 'toggled_user_active', 'User', user.id, f'is_active={user.is_active}')
-        messages.success(request, f'{user.username} is now {"active" if user.is_active else "inactive"}.')
-        return redirect('user-list')
-
-
-class TaskApprovalUpdateView(RoleRequiredMixin, UpdateView):
-    allowed_roles = (UserProfile.Role.ADMIN, UserProfile.Role.MANAGER)
+class TaskUpdateView(RoleRequiredMixin, UpdateView):
+    allowed_roles = (AppRole.ADMIN, AppRole.MANAGER)
     model = Task
-    form_class = TaskApprovalForm
+    form_class = TaskUpdateForm
     template_name = 'core/form.html'
 
-    def dispatch(self, request, *args, **kwargs):
-        task = self.get_object()
-        if not request.user.is_superuser and (not task.project or task.project.team.manager_id != request.user.id):
-            raise PermissionDenied('You can only approve tasks from your team.')
-        return super().dispatch(request, *args, **kwargs)
+    def get_queryset(self):
+        return get_visible_tasks(self.request.user)
+
+    def get_form(self, form_class=None):
+        form = super().get_form(form_class)
+        if current_user_role(self.request.user) == AppRole.MANAGER:
+            form.fields['project'].queryset = get_visible_projects(self.request.user)
+            form.fields['assigned_to'].queryset = get_visible_employees(self.request.user)
+        return form
 
     def form_valid(self, form):
-        task = form.save(commit=False)
-        if task.approval_status == Task.ApprovalStatus.APPROVED:
-            task.status = Task.Status.COMPLETED
-        elif task.approval_status == Task.ApprovalStatus.REWORK:
-            task.status = Task.Status.IN_PROGRESS
-        task.save()
+        task = form.save()
         sync_project_status(task.project)
-        create_audit_log(self.request.user, 'reviewed_task_approval', 'Task', task.id, task.approval_status)
-        if task.assigned_to and task.assigned_to.user:
-            create_notification(
-                task.assigned_to.user,
-                'Task approval updated',
-                f'"{task.title}" is now {task.get_approval_status_display()}.',
-                Notification.Kind.APPROVAL,
-            )
-        messages.success(self.request, 'Task approval updated successfully.')
+        create_audit_log(self.request.user, 'updated_task', 'Task', task.id, task.title)
+        messages.success(self.request, 'Task updated successfully.')
         return redirect('task-detail', pk=task.pk)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = 'Approve Task'
+        context['title'] = 'Edit Task'
         return context
 
 
+class TaskApprovalUpdateView(RoleRequiredMixin, UpdateView):
+    allowed_roles = (AppRole.ADMIN, AppRole.MANAGER)
+    model = Request
+    form_class = TaskApprovalForm
+    template_name = 'core/form.html'
+
+    def get_object(self, queryset=None):
+        task = get_object_or_404(get_visible_tasks(self.request.user), pk=self.kwargs['pk'])
+        request_obj = task.latest_approval_request
+        if request_obj is None:
+            raise PermissionDenied('No approval request exists for this task.')
+        return request_obj
+
+    def form_valid(self, form):
+        approval_request = form.save(commit=False)
+        approval_request.reviewed_by = self.request.user
+        approval_request.reviewed_at = timezone.now()
+        approval_request.save()
+
+        task = approval_request.task
+        if approval_request.status == Request.Status.APPROVED:
+            task.status = Task.Status.COMPLETED
+            task.progress = 100
+        else:
+            task.status = Task.Status.IN_PROGRESS
+        task.save()
+        sync_project_status(task.project)
+
+        if task.assigned_to and task.assigned_to.user:
+            create_notification(task.assigned_to.user, 'Task approval updated', f'{task.title} approval status: {approval_request.get_status_display()}.')
+
+        create_audit_log(self.request.user, 'reviewed_task_request', 'Request', approval_request.id, task.title)
+        messages.success(self.request, 'Approval decision saved.')
+        return redirect('task-detail', pk=task.pk)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = 'Review Task Approval'
+        return context
+
+
+class TaskCommentCreateView(RoleRequiredMixin, CreateView):
+    allowed_roles = (AppRole.ADMIN, AppRole.MANAGER, AppRole.EMPLOYEE)
+    form_class = TaskCommentForm
+    template_name = 'core/form.html'
+
+    def dispatch(self, request, *args, **kwargs):
+        self.task = get_object_or_404(get_visible_tasks(request.user), pk=kwargs['pk'])
+        return super().dispatch(request, *args, **kwargs)
+
+    def form_valid(self, form):
+        create_activity(
+            Activity.Type.COMMENT,
+            user=self.request.user,
+            task=self.task,
+            project=self.task.project,
+            title=f'Comment on {self.task.title}',
+            message=form.cleaned_data['message'],
+        )
+        messages.success(self.request, 'Comment added.')
+        return redirect('task-detail', pk=self.task.pk)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = 'Add Comment'
+        return context
+
+
+class TaskAttachmentCreateView(RoleRequiredMixin, CreateView):
+    allowed_roles = (AppRole.ADMIN, AppRole.MANAGER, AppRole.EMPLOYEE)
+    model = Attachment
+    form_class = TaskAttachmentForm
+    template_name = 'core/form.html'
+
+    def dispatch(self, request, *args, **kwargs):
+        self.task = get_object_or_404(get_visible_tasks(request.user), pk=kwargs['pk'])
+        return super().dispatch(request, *args, **kwargs)
+
+    def form_valid(self, form):
+        attachment = form.save(commit=False)
+        attachment.task = self.task
+        attachment.uploaded_by = self.request.user
+        attachment.save()
+        messages.success(self.request, 'Attachment uploaded.')
+        return redirect('task-detail', pk=self.task.pk)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = 'Upload Attachment'
+        return context
+
+
+class TaskLogCreateView(RoleRequiredMixin, CreateView):
+    allowed_roles = (AppRole.ADMIN, AppRole.MANAGER, AppRole.EMPLOYEE)
+    model = TaskLog
+    form_class = TaskLogForm
+    template_name = 'core/form.html'
+    success_url = reverse_lazy('task-list')
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['employee'] = get_employee_for_user(self.request.user)
+        kwargs['role'] = current_user_role(self.request.user)
+        task_id = self.request.GET.get('task')
+        if task_id:
+            try:
+                task = get_visible_tasks(self.request.user).get(pk=task_id)
+                kwargs.setdefault('initial', {})['task'] = task
+                kwargs.setdefault('initial', {})['progress_after_log'] = task.progress
+            except Task.DoesNotExist:
+                pass
+        return kwargs
+
+    def form_valid(self, form):
+        employee = form.cleaned_data['employee']
+        task = form.cleaned_data['task']
+        role = current_user_role(self.request.user)
+        if role == AppRole.EMPLOYEE and task.assigned_to_id != employee.id:
+            raise PermissionDenied('You can only log work for your own assigned tasks.')
+
+        task_log = form.save()
+        progress = form.cleaned_data.get('progress_after_log')
+        if progress is not None:
+            task.progress = progress
+            if progress >= 100:
+                task.status = Task.Status.SUBMITTED if task.requires_approval else Task.Status.COMPLETED
+            elif progress > 0:
+                task.status = Task.Status.IN_PROGRESS
+            task.save()
+            sync_project_status(task.project)
+
+        if task.requires_approval and task.status == Task.Status.SUBMITTED:
+            approval_request, created = Request.objects.get_or_create(
+                request_type=Request.Type.TASK_APPROVAL,
+                task=task,
+                employee=employee,
+                status=Request.Status.PENDING,
+                defaults={'raised_by': self.request.user, 'remarks': 'Submitted for manager approval.'},
+            )
+            if created and task.project.team and task.project.team.manager:
+                create_notification(task.project.team.manager, 'Task submitted for approval', f'{task.title} is ready for review.')
+
+        create_audit_log(self.request.user, 'logged_work', 'TaskLog', task_log.id, task.title)
+        messages.success(self.request, 'Work log saved successfully.')
+        return redirect('task-detail', pk=task.pk)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = 'Log Work'
+        task_id = self.request.GET.get('task')
+        if task_id:
+            context['selected_task'] = get_object_or_404(get_visible_tasks(self.request.user), pk=task_id)
+        return context
+
+
+class AnalyticsView(RoleRequiredMixin, TemplateView):
+    allowed_roles = (AppRole.ADMIN, AppRole.MANAGER, AppRole.EMPLOYEE)
+    template_name = 'core/analytics.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        role = current_user_role(self.request.user)
+        tasks = get_visible_tasks(self.request.user)
+        employees = list(get_visible_employees(self.request.user))
+
+        if role == AppRole.EMPLOYEE:
+            employee = get_employee_for_user(self.request.user)
+            analytics_rows = [(employee, employee_metrics(employee))] if employee else []
+            employee_profile_rows = [(employee, employee_ai_profile(employee))] if employee else []
+        else:
+            analytics_rows = [(employee, employee_metrics(employee)) for employee in employees]
+            employee_profile_rows = [(employee, employee_ai_profile(employee)) for employee in employees]
+
+        context.update(
+            {
+                'analytics_role': role,
+                'task_count': tasks.count(),
+                'completed_count': tasks.filter(status=Task.Status.COMPLETED).count(),
+                'delayed_count': len([task for task in tasks if task.is_delayed]),
+                'employee_metrics': analytics_rows,
+                'ai_results': [upsert_ai_result(task) for task in tasks[:12]],
+                'employee_ai_profiles': employee_profile_rows,
+                'project_ai_rows': [project_ai_summary(project) for project in get_visible_projects(self.request.user)[:10]],
+                'team_health_rows': [team_health_summary(team) for team in get_visible_teams(self.request.user)],
+                'task_anomalies': [(task, task_anomaly_analysis(task)) for task in tasks[:10]],
+            }
+        )
+        return context
+
+
+class ApprovalQueueView(RoleRequiredMixin, ListView):
+    allowed_roles = (AppRole.ADMIN, AppRole.MANAGER)
+    template_name = 'core/approval_queue.html'
+    context_object_name = 'requests'
+
+    def get_queryset(self):
+        return get_visible_requests(self.request.user).filter(
+            request_type=Request.Type.TASK_APPROVAL,
+            status=Request.Status.PENDING,
+        )
+
+
 class PerformanceReviewListView(RoleRequiredMixin, ListView):
-    allowed_roles = (UserProfile.Role.ADMIN, UserProfile.Role.MANAGER, UserProfile.Role.EMPLOYEE)
-    model = PerformanceReview
+    allowed_roles = (AppRole.ADMIN, AppRole.MANAGER, AppRole.EMPLOYEE)
     template_name = 'core/performance_review_list.html'
     context_object_name = 'reviews'
 
     def get_queryset(self):
-        queryset = PerformanceReview.objects.select_related('employee', 'manager', 'employee__team')
-        profile = getattr(self.request.user, 'profile', None)
-        role = UserProfile.Role.ADMIN if self.request.user.is_superuser else getattr(profile, 'role', None)
-        if role == UserProfile.Role.MANAGER:
-            queryset = queryset.filter(employee__team__manager=self.request.user)
-        elif role == UserProfile.Role.EMPLOYEE:
-            employee = getattr(self.request.user, 'employee_profile', None)
-            queryset = queryset.filter(employee=employee) if employee else queryset.none()
+        queryset = get_visible_activities(self.request.user).filter(activity_type=Activity.Type.REVIEW)
+        if current_user_role(self.request.user) == AppRole.EMPLOYEE:
+            queryset = queryset.filter(user=self.request.user)
         return queryset
 
 
 class PerformanceReviewCreateView(RoleRequiredMixin, CreateView):
-    allowed_roles = (UserProfile.Role.ADMIN, UserProfile.Role.MANAGER)
-    model = PerformanceReview
+    allowed_roles = (AppRole.ADMIN, AppRole.MANAGER)
     form_class = PerformanceReviewForm
     template_name = 'core/form.html'
     success_url = reverse_lazy('performance-review-list')
 
-    def get_form(self, form_class=None):
-        form = super().get_form(form_class)
-        if not self.request.user.is_superuser:
-            form.fields['employee'].queryset = Employee.objects.filter(team__manager=self.request.user)
-        return form
-
     def form_valid(self, form):
-        review = form.save(commit=False)
-        review.manager = self.request.user
-        review.save()
-        create_audit_log(self.request.user, 'created_performance_review', 'PerformanceReview', review.id, review.employee.name)
-        if review.employee.user:
-            create_notification(
-                review.employee.user,
-                'Performance review added',
-                f'A new performance review with rating {review.rating}/5 has been added.',
-                Notification.Kind.SYSTEM,
-            )
-        messages.success(self.request, 'Performance review saved successfully.')
+        employee = form.cleaned_data['employee']
+        create_activity(
+            Activity.Type.REVIEW,
+            user=employee.user,
+            project=None,
+            title=form.cleaned_data['title'] or f'Performance review - {employee.name}',
+            message=form.cleaned_data['message'],
+            rating=form.cleaned_data.get('rating'),
+        )
+        create_audit_log(self.request.user, 'created_review', 'Employee', employee.id, employee.name)
+        messages.success(self.request, 'Performance review recorded.')
         return redirect(self.success_url)
 
     def get_context_data(self, **kwargs):
@@ -1049,93 +864,83 @@ class PerformanceReviewCreateView(RoleRequiredMixin, CreateView):
         context['title'] = 'Add Performance Review'
         return context
 
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['employee_queryset'] = get_visible_employees(self.request.user)
+        return kwargs
 
-class NotificationListView(RoleLoginRequiredMixin, ListView):
-    model = Notification
+
+class NotificationListView(RoleRequiredMixin, ListView):
+    allowed_roles = (AppRole.ADMIN, AppRole.MANAGER, AppRole.EMPLOYEE)
     template_name = 'core/notification_list.html'
     context_object_name = 'notifications'
 
     def get_queryset(self):
-        queryset = Notification.objects.filter(recipient=self.request.user)
-        queryset.filter(is_read=False).update(is_read=True)
-        return queryset
+        return get_visible_activities(self.request.user).filter(activity_type=Activity.Type.NOTIFICATION, user=self.request.user)
 
 
 class LeaveRequestListView(RoleRequiredMixin, ListView):
-    allowed_roles = (UserProfile.Role.ADMIN, UserProfile.Role.MANAGER, UserProfile.Role.EMPLOYEE)
-    model = LeaveRequest
+    allowed_roles = (AppRole.ADMIN, AppRole.MANAGER, AppRole.EMPLOYEE)
     template_name = 'core/leave_request_list.html'
-    context_object_name = 'leave_requests'
+    context_object_name = 'requests'
 
     def get_queryset(self):
-        queryset = LeaveRequest.objects.select_related('employee', 'employee__team')
-        profile = getattr(self.request.user, 'profile', None)
-        role = UserProfile.Role.ADMIN if self.request.user.is_superuser else getattr(profile, 'role', None)
-        if role == UserProfile.Role.MANAGER:
-            queryset = queryset.filter(employee__team__manager=self.request.user)
-        elif role == UserProfile.Role.EMPLOYEE:
-            employee = getattr(self.request.user, 'employee_profile', None)
-            queryset = queryset.filter(employee=employee) if employee else queryset.none()
-        return queryset
+        return get_visible_requests(self.request.user).filter(request_type=Request.Type.LEAVE)
 
 
 class LeaveRequestCreateView(RoleRequiredMixin, CreateView):
-    allowed_roles = (UserProfile.Role.ADMIN, UserProfile.Role.MANAGER, UserProfile.Role.EMPLOYEE)
-    model = LeaveRequest
+    allowed_roles = (AppRole.ADMIN, AppRole.MANAGER, AppRole.EMPLOYEE)
+    model = Request
     form_class = LeaveRequestForm
     template_name = 'core/form.html'
     success_url = reverse_lazy('leave-request-list')
 
     def dispatch(self, request, *args, **kwargs):
-        if getattr(request.user, 'employee_profile', None) is None:
+        self.employee = get_employee_for_user(request.user)
+        if self.employee is None:
             raise PermissionDenied('A linked employee profile is required to request leave.')
         return super().dispatch(request, *args, **kwargs)
 
     def form_valid(self, form):
-        leave = form.save(commit=False)
-        leave.employee = self.request.user.employee_profile
-        leave.save()
-        if leave.employee.team and leave.employee.team.manager:
-            create_notification(
-                leave.employee.team.manager,
-                'Leave request submitted',
-                f'{leave.employee.name} requested leave from {leave.start_date} to {leave.end_date}.',
-                Notification.Kind.SYSTEM,
-            )
-        create_audit_log(self.request.user, 'created_leave_request', 'LeaveRequest', leave.id, leave.reason[:120])
-        messages.success(self.request, 'Leave request submitted successfully.')
+        leave_request = form.save(commit=False)
+        leave_request.employee = self.employee
+        leave_request.raised_by = self.request.user
+        leave_request.request_type = Request.Type.LEAVE
+        leave_request.status = Request.Status.PENDING
+        leave_request.save()
+        if self.employee.team and self.employee.team.manager:
+            create_notification(self.employee.team.manager, 'New leave request', f'{self.employee.name} submitted a leave request.')
+        messages.success(self.request, 'Leave request submitted.')
         return redirect(self.success_url)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = 'Request Leave'
+        context['title'] = 'Create Leave Request'
         return context
 
 
 class LeaveApprovalUpdateView(RoleRequiredMixin, UpdateView):
-    allowed_roles = (UserProfile.Role.ADMIN, UserProfile.Role.MANAGER)
-    model = LeaveRequest
+    allowed_roles = (AppRole.ADMIN, AppRole.MANAGER)
+    model = Request
     form_class = LeaveApprovalForm
     template_name = 'core/form.html'
     success_url = reverse_lazy('leave-request-list')
 
-    def dispatch(self, request, *args, **kwargs):
-        leave = self.get_object()
-        if not request.user.is_superuser and leave.employee.team.manager_id != request.user.id:
-            raise PermissionDenied('You can only review leave requests from your team.')
-        return super().dispatch(request, *args, **kwargs)
+    def get_queryset(self):
+        return get_visible_requests(self.request.user).filter(request_type=Request.Type.LEAVE)
 
     def form_valid(self, form):
-        leave = form.save()
-        if leave.employee.user:
+        leave_request = form.save(commit=False)
+        leave_request.reviewed_by = self.request.user
+        leave_request.reviewed_at = timezone.now()
+        leave_request.save()
+        if leave_request.employee.user:
             create_notification(
-                leave.employee.user,
+                leave_request.employee.user,
                 'Leave request updated',
-                f'Your leave request is now {leave.get_status_display()}.',
-                Notification.Kind.SYSTEM,
+                f'Your leave request status is now {leave_request.get_status_display()}.',
             )
-        create_audit_log(self.request.user, 'updated_leave_request', 'LeaveRequest', leave.id, leave.status)
-        messages.success(self.request, 'Leave request updated successfully.')
+        messages.success(self.request, 'Leave request updated.')
         return redirect(self.success_url)
 
     def get_context_data(self, **kwargs):
@@ -1145,7 +950,9 @@ class LeaveApprovalUpdateView(RoleRequiredMixin, UpdateView):
 
 
 class AuditLogListView(RoleRequiredMixin, ListView):
-    allowed_roles = (UserProfile.Role.ADMIN,)
-    model = AuditLog
+    allowed_roles = (AppRole.ADMIN,)
     template_name = 'core/audit_log_list.html'
-    context_object_name = 'audit_logs'
+    context_object_name = 'activities'
+
+    def get_queryset(self):
+        return Activity.objects.filter(activity_type=Activity.Type.AUDIT)

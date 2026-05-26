@@ -1,27 +1,2 @@
 {% extends 'manager/managebase.html' %}
-
-{% block title %}Calendar | Productivity System{% endblock %}
-
-{% block content %}
-<section class="page-head">
-    <div>
-        <p class="eyebrow">Timeline View</p>
-        <h2>Task Calendar</h2>
-    </div>
-</section>
-
-<section class="panel">
-    {% for item in calendar_items %}
-        <div class="list-row">
-            <div>
-                <a href="{% url 'task-detail' item.pk %}">{{ item.title }}</a>
-                <p class="muted">{{ item.project.name|default:'No project' }} | {{ item.assigned_to|default:'Unassigned' }}</p>
-            </div>
-            <span>{{ item.deadline }}</span>
-        </div>
-    {% empty %}
-        <p class="muted">No calendar items available.</p>
-    {% endfor %}
-</section>
-{% endblock %}
-
+{% block content %}{% include 'partials/calendar_content.html' %}{% endblock %}

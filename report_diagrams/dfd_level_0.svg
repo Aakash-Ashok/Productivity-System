@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+  <style>
+    .title { font: 700 30px Arial, sans-serif; fill: #000000; }
+    .entity { fill: #ffffff; stroke: #000000; stroke-width: 2; }
+    .process { fill: #ffffff; stroke: #000000; stroke-width: 3; }
+    .text { font: 700 20px Arial, sans-serif; fill: #000000; }
+    .small { font: 15px Arial, sans-serif; fill: #000000; }
+    .arrow { stroke: #000000; stroke-width: 2.5; marker-end: url(#arrow); fill: none; }
+  </style>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#000000"/>
+    </marker>
+  </defs>
+  <text x="800" y="50" text-anchor="middle" class="title">DFD Level 0 - AI Powered Employee Productivity and Task Management System</text>
+
+  <rect x="110" y="300" width="220" height="120" rx="12" class="entity"/>
+  <text x="220" y="355" text-anchor="middle" class="text">Admin</text>
+
+  <rect x="1270" y="180" width="220" height="120" rx="12" class="entity"/>
+  <text x="1380" y="235" text-anchor="middle" class="text">Manager</text>
+
+  <rect x="1270" y="520" width="220" height="120" rx="12" class="entity"/>
+  <text x="1380" y="575" text-anchor="middle" class="text">Employee</text>
+
+  <ellipse cx="800" cy="450" rx="260" ry="160" class="process"/>
+  <text x="800" y="420" text-anchor="middle" class="text">AI Powered Employee</text>
+  <text x="800" y="455" text-anchor="middle" class="text">Productivity and Task</text>
+  <text x="800" y="490" text-anchor="middle" class="text">Management System</text>
+
+  <line x1="330" y1="330" x2="540" y2="360" class="arrow"/>
+  <text x="405" y="320" class="small">users, teams, projects</text>
+
+  <line x1="540" y1="400" x2="330" y2="390" class="arrow"/>
+  <text x="400" y="430" class="small">reports, analytics, status</text>
+
+  <line x1="1270" y1="250" x2="1050" y2="340" class="arrow"/>
+  <text x="1115" y="230" class="small">tasks, approvals</text>
+
+  <line x1="1050" y1="385" x2="1270" y2="285" class="arrow"/>
+  <text x="1100" y="410" class="small">dashboard, alerts</text>
+
+  <line x1="1270" y1="565" x2="1050" y2="525" class="arrow"/>
+  <text x="1110" y="590" class="small">logs, progress, requests</text>
+
+  <line x1="1050" y1="565" x2="1270" y2="605" class="arrow"/>
+  <text x="1090" y="535" class="small">tasks, notifications, AI insights</text>
+</svg>

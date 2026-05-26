@@ -1,9 +1,9 @@
 from django.urls import path
 
 from .views import (
-    AuditLogListView,
     AnalyticsView,
     ApprovalQueueView,
+    AuditLogListView,
     CalendarView,
     DashboardView,
     EmployeeCreateView,
@@ -13,8 +13,6 @@ from .views import (
     LeaveApprovalUpdateView,
     LeaveRequestCreateView,
     LeaveRequestListView,
-    MilestoneCreateView,
-    MilestoneListView,
     NotificationListView,
     PerformanceReviewCreateView,
     PerformanceReviewListView,
@@ -23,8 +21,6 @@ from .views import (
     ProjectCreateView,
     ProjectListView,
     ProjectUpdateView,
-    RecurringTaskCreateView,
-    RecurringTaskListView,
     TaskApprovalUpdateView,
     TaskAttachmentCreateView,
     TaskCommentCreateView,
@@ -49,7 +45,6 @@ urlpatterns = [
     path('users/new/', UserCreateView.as_view(), name='user-create'),
     path('users/<int:pk>/edit/', UserAdminUpdateView.as_view(), name='user-update'),
     path('users/<int:pk>/toggle-active/', UserToggleActiveView.as_view(), name='user-toggle-active'),
-    path('audit-logs/', AuditLogListView.as_view(), name='audit-log-list'),
     path('teams/', TeamListView.as_view(), name='team-list'),
     path('teams/new/', TeamCreateView.as_view(), name='team-create'),
     path('teams/<int:pk>/edit/', TeamUpdateView.as_view(), name='team-update'),
@@ -60,10 +55,6 @@ urlpatterns = [
     path('projects/new/', ProjectCreateView.as_view(), name='project-create'),
     path('projects/<int:pk>/edit/', ProjectUpdateView.as_view(), name='project-update'),
     path('planning/', PlanningHubView.as_view(), name='planning-hub'),
-    path('milestones/', MilestoneListView.as_view(), name='milestone-list'),
-    path('milestones/new/', MilestoneCreateView.as_view(), name='milestone-create'),
-    path('recurring-tasks/', RecurringTaskListView.as_view(), name='recurring-task-list'),
-    path('recurring-tasks/new/', RecurringTaskCreateView.as_view(), name='recurring-task-create'),
     path('tasks/', TaskListView.as_view(), name='task-list'),
     path('tasks/kanban/', KanbanBoardView.as_view(), name='kanban-board'),
     path('tasks/calendar/', CalendarView.as_view(), name='calendar-view'),
@@ -82,4 +73,5 @@ urlpatterns = [
     path('leave-requests/', LeaveRequestListView.as_view(), name='leave-request-list'),
     path('leave-requests/new/', LeaveRequestCreateView.as_view(), name='leave-request-create'),
     path('leave-requests/<int:pk>/review/', LeaveApprovalUpdateView.as_view(), name='leave-request-review'),
+    path('audit-logs/', AuditLogListView.as_view(), name='audit-log-list'),
 ]

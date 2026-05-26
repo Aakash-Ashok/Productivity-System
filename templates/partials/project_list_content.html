@@ -1,0 +1,391 @@
+<style>
+.project-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:25px;
+    flex-wrap:wrap;
+    gap:15px;
+}
+
+.project-title h1{
+    font-size:32px;
+    color:#0f172a;
+    margin-bottom:6px;
+}
+
+.project-title p{
+    color:#64748b;
+}
+
+.create-project-btn{
+    background:linear-gradient(135deg,#4f46e5,#7c3aed);
+    color:white;
+    text-decoration:none;
+    padding:12px 18px;
+    border-radius:12px;
+    font-weight:600;
+    transition:.25s;
+}
+
+.create-project-btn:hover{
+    transform:translateY(-2px);
+    box-shadow:0 10px 25px rgba(79,70,229,.25);
+}
+
+.stats-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+    gap:18px;
+    margin-bottom:25px;
+}
+
+.stat-card{
+    background:white;
+    border-radius:18px;
+    padding:22px;
+    text-align:center;
+    box-shadow:0 10px 25px rgba(0,0,0,.05);
+}
+
+.stat-number{
+    font-size:32px;
+    font-weight:700;
+    color:#4f46e5;
+}
+
+.stat-label{
+    color:#64748b;
+    margin-top:5px;
+}
+
+.project-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(350px,1fr));
+    gap:20px;
+}
+
+.project-card{
+    background:white;
+    border-radius:24px;
+    padding:24px;
+    box-shadow:0 10px 30px rgba(0,0,0,.05);
+    transition:.25s;
+    border:1px solid #eef2ff;
+}
+
+.project-card:hover{
+    transform:translateY(-4px);
+    box-shadow:0 15px 35px rgba(0,0,0,.08);
+}
+
+.project-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    margin-bottom:16px;
+}
+
+.project-name{
+    font-size:20px;
+    font-weight:700;
+    color:#0f172a;
+}
+
+.team-chip{
+    display:inline-block;
+    background:#eef2ff;
+    color:#4338ca;
+    padding:6px 12px;
+    border-radius:999px;
+    font-size:13px;
+    font-weight:600;
+}
+
+.project-meta{
+    margin-bottom:18px;
+}
+
+.meta-row{
+    display:flex;
+    justify-content:space-between;
+    margin-bottom:10px;
+}
+
+.meta-label{
+    color:#64748b;
+}
+
+.meta-value{
+    font-weight:600;
+    color:#0f172a;
+}
+
+.status-badge{
+    display:inline-block;
+    padding:6px 12px;
+    border-radius:999px;
+    font-size:12px;
+    font-weight:600;
+}
+
+.status-active{
+    background:#dcfce7;
+    color:#166534;
+}
+
+.status-progress{
+    background:#dbeafe;
+    color:#1d4ed8;
+}
+
+.status-pending{
+    background:#fef3c7;
+    color:#92400e;
+}
+
+.status-completed{
+    background:#ede9fe;
+    color:#6d28d9;
+}
+
+.progress-section{
+    margin-top:15px;
+}
+
+.progress-header{
+    display:flex;
+    justify-content:space-between;
+    margin-bottom:8px;
+    font-size:14px;
+}
+
+.progress-bar{
+    width:100%;
+    height:10px;
+    background:#e5e7eb;
+    border-radius:999px;
+    overflow:hidden;
+}
+
+.progress-fill{
+    height:100%;
+    background:linear-gradient(
+        90deg,
+        #4f46e5,
+        #8b5cf6
+    );
+}
+
+.project-footer{
+    margin-top:20px;
+    padding-top:15px;
+    border-top:1px solid #e5e7eb;
+    display:flex;
+    justify-content:flex-end;
+}
+
+.edit-btn{
+    text-decoration:none;
+    background:#eef2ff;
+    color:#4338ca;
+    padding:10px 16px;
+    border-radius:10px;
+    font-weight:600;
+    transition:.25s;
+}
+
+.edit-btn:hover{
+    background:#4338ca;
+    color:white;
+}
+
+.empty-state{
+    background:white;
+    border-radius:24px;
+    padding:70px 20px;
+    text-align:center;
+    box-shadow:0 10px 30px rgba(0,0,0,.05);
+}
+
+.empty-state i{
+    font-size:60px;
+    color:#cbd5e1;
+    margin-bottom:15px;
+}
+
+.empty-state h3{
+    color:#334155;
+    margin-bottom:10px;
+}
+
+.empty-state p{
+    color:#64748b;
+}
+
+@media(max-width:768px){
+
+    .project-grid{
+        grid-template-columns:1fr;
+    }
+
+}
+</style>
+
+<!-- Header -->
+<section class="project-header">
+
+    <div class="project-title">
+        <h1>Projects</h1>
+        <p>
+            Track project progress, deadlines and team assignments.
+        </p>
+    </div>
+
+    {% if is_admin_role %}
+        <a href="{% url 'project-create' %}"
+           class="create-project-btn">
+            + Create Project
+        </a>
+    {% endif %}
+
+</section>
+
+<!-- Stats -->
+<section class="stats-grid">
+
+    <div class="stat-card">
+        <div class="stat-number">
+            {{ projects|length }}
+        </div>
+        <div class="stat-label">
+            Total Projects
+        </div>
+    </div>
+
+</section>
+
+<!-- Projects -->
+{% if projects %}
+
+<section class="project-grid">
+
+{% for project in projects %}
+
+<article class="project-card">
+
+    <div class="project-top">
+
+        <div class="project-name">
+            {{ project.name }}
+        </div>
+
+        <span class="team-chip">
+            {{ project.team.name|default:"No Team" }}
+        </span>
+
+    </div>
+
+    <div class="project-meta">
+
+        <div class="meta-row">
+            <span class="meta-label">
+                Deadline
+            </span>
+
+            <span class="meta-value">
+                {{ project.deadline }}
+            </span>
+        </div>
+
+        <div class="meta-row">
+            <span class="meta-label">
+                Status
+            </span>
+
+            <span>
+
+                {% if project.status == 'active' %}
+                    <span class="status-badge status-active">
+                        Active
+                    </span>
+
+                {% elif project.status == 'in_progress' %}
+                    <span class="status-badge status-progress">
+                        In Progress
+                    </span>
+
+                {% elif project.status == 'completed' %}
+                    <span class="status-badge status-completed">
+                        Completed
+                    </span>
+
+                {% else %}
+                    <span class="status-badge status-pending">
+                        {{ project.get_status_display }}
+                    </span>
+                {% endif %}
+
+            </span>
+        </div>
+
+    </div>
+
+    <div class="progress-section">
+
+        <div class="progress-header">
+
+            <span>
+                Progress
+            </span>
+
+            <span>
+                {{ project.progress }}%
+            </span>
+
+        </div>
+
+        <div class="progress-bar">
+
+            <div class="progress-fill"
+                 style="width:{{ project.progress }}%">
+            </div>
+
+        </div>
+
+    </div>
+
+    {% if is_admin_role %}
+
+    <div class="project-footer">
+
+        <a href="{% url 'project-update' project.pk %}"
+           class="edit-btn">
+            Edit Project
+        </a>
+
+    </div>
+
+    {% endif %}
+
+</article>
+
+{% endfor %}
+
+</section>
+
+{% else %}
+
+<div class="empty-state">
+
+    <i class="fa-solid fa-folder-open"></i>
+
+    <h3>No Projects Found</h3>
+
+    <p>
+        Create your first project to start tracking work and progress.
+    </p>
+
+</div>
+
+{% endif %}

@@ -1,20 +1,15 @@
-from .models import UserProfile
+from .models import AppRole, current_user_role
 
 
 def role_context(request):
-    role = 'guest'
-    if request.user.is_authenticated:
-        if request.user.is_superuser:
-            role = UserProfile.Role.ADMIN
-        else:
-            role = getattr(getattr(request.user, 'profile', None), 'role', 'unassigned')
+    role = current_user_role(request.user)
 
     return {
         'current_role': role,
-        'is_admin_role': role == UserProfile.Role.ADMIN,
-        'is_manager_role': role == UserProfile.Role.MANAGER,
-        'is_employee_role': role == UserProfile.Role.EMPLOYEE,
-        'can_manage_org': role == UserProfile.Role.ADMIN,
-        'can_manage_delivery': role in {UserProfile.Role.ADMIN, UserProfile.Role.MANAGER},
-        'can_log_work': role in {UserProfile.Role.ADMIN, UserProfile.Role.MANAGER, UserProfile.Role.EMPLOYEE},
+        'is_admin_role': role == AppRole.ADMIN,
+        'is_manager_role': role == AppRole.MANAGER,
+        'is_employee_role': role == AppRole.EMPLOYEE,
+        'can_manage_org': role == AppRole.ADMIN,
+        'can_manage_delivery': role in {AppRole.ADMIN, AppRole.MANAGER},
+        'can_log_work': role in {AppRole.ADMIN, AppRole.MANAGER, AppRole.EMPLOYEE},
     }

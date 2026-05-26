@@ -1,23 +1,52 @@
-from django.contrib.auth.models import User
+from __future__ import annotations
+
+from decimal import Decimal
+
+from django.contrib.auth.models import Group, User
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils import timezone
 
 
-class UserProfile(models.Model):
-    class Role(models.TextChoices):
-        ADMIN = 'admin', 'Admin'
-        MANAGER = 'manager', 'Manager'
-        EMPLOYEE = 'employee', 'Employee'
+class AppRole(models.TextChoices):
+    ADMIN = 'admin', 'Admin'
+    MANAGER = 'manager', 'Manager'
+    EMPLOYEE = 'employee', 'Employee'
 
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
-    role = models.CharField(max_length=20, choices=Role.choices, default=Role.EMPLOYEE)
 
-    class Meta:
-        ordering = ['user__username']
+def assign_user_role(user: User, role: str) -> User:
+    user.groups.clear()
 
-    def __str__(self):
-        return f'{self.user.username} ({self.role})'
+    if role == AppRole.ADMIN:
+        user.is_staff = True
+        user.is_superuser = True
+    elif role == AppRole.MANAGER:
+        user.is_staff = True
+        user.is_superuser = False
+        group, _ = Group.objects.get_or_create(name=AppRole.MANAGER)
+        user.groups.add(group)
+    else:
+        user.is_staff = False
+        user.is_superuser = False
+        group, _ = Group.objects.get_or_create(name=AppRole.EMPLOYEE)
+        user.groups.add(group)
+
+    user.save(update_fields=['is_staff', 'is_superuser'])
+    return user
+
+
+def current_user_role(user: User | None) -> str:
+    if not user or not user.is_authenticated:
+        return 'guest'
+    if user.is_superuser:
+        return AppRole.ADMIN
+    if user.groups.filter(name=AppRole.MANAGER).exists():
+        return AppRole.MANAGER
+    if user.groups.filter(name=AppRole.EMPLOYEE).exists():
+        return AppRole.EMPLOYEE
+    if hasattr(user, 'employee_profile'):
+        return AppRole.EMPLOYEE
+    return 'unassigned'
 
 
 class Team(models.Model):
@@ -28,6 +57,7 @@ class Team(models.Model):
         null=True,
         blank=True,
         related_name='managed_teams',
+        limit_choices_to={'is_staff': True},
     )
     description = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -35,7 +65,7 @@ class Team(models.Model):
     class Meta:
         ordering = ['name']
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.name
 
 
@@ -44,6 +74,7 @@ class Employee(models.Model):
         AVAILABLE = 'available', 'Available'
         BUSY = 'busy', 'Busy'
         OVERLOADED = 'overloaded', 'Overloaded'
+        ON_LEAVE = 'on_leave', 'On Leave'
 
     user = models.OneToOneField(
         User,
@@ -52,46 +83,35 @@ class Employee(models.Model):
         blank=True,
         related_name='employee_profile',
     )
-    team = models.ForeignKey(
-        Team,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='employees',
-    )
+    team = models.ForeignKey(Team, on_delete=models.SET_NULL, null=True, blank=True, related_name='employees')
     name = models.CharField(max_length=150)
     email = models.EmailField(unique=True)
-    job_title = models.CharField(max_length=120, blank=True)
-    skills = models.TextField(help_text='Comma-separated skills for smart allocation.')
-    experience_years = models.PositiveIntegerField(default=0)
-    weekly_capacity_hours = models.PositiveIntegerField(default=40)
-    availability = models.CharField(
-        max_length=20,
-        choices=Availability.choices,
-        default=Availability.AVAILABLE,
-    )
+    job_title = models.CharField(max_length=150, blank=True)
+    skills = models.TextField(blank=True)
+    experience = models.PositiveIntegerField(default=0)
+    availability = models.CharField(max_length=20, choices=Availability.choices, default=Availability.AVAILABLE)
+    weekly_capacity_hours = models.DecimalField(max_digits=6, decimal_places=2, default=Decimal('40.00'))
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ['name']
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.name
 
     @property
-    def skill_list(self):
-        return [skill.strip().lower() for skill in self.skills.split(',') if skill.strip()]
+    def skill_list(self) -> list[str]:
+        return [item.strip().lower() for item in self.skills.split(',') if item.strip()]
 
 
 class Project(models.Model):
     class Status(models.TextChoices):
         PLANNING = 'planning', 'Planning'
         ACTIVE = 'active', 'Active'
-        ON_HOLD = 'on_hold', 'On Hold'
         COMPLETED = 'completed', 'Completed'
 
-    name = models.CharField(max_length=200)
-    team = models.ForeignKey(Team, on_delete=models.CASCADE, related_name='projects')
+    name = models.CharField(max_length=180)
+    team = models.ForeignKey(Team, on_delete=models.SET_NULL, null=True, blank=True, related_name='projects')
     description = models.TextField(blank=True)
     deadline = models.DateField()
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PLANNING)
@@ -99,34 +119,17 @@ class Project(models.Model):
 
     class Meta:
         ordering = ['deadline', 'name']
+        unique_together = ('name', 'team')
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.name
 
     @property
-    def progress(self):
-        tasks = self.tasks.all()
-        if not tasks:
+    def progress(self) -> int:
+        task_progress = list(self.tasks.values_list('progress', flat=True))
+        if not task_progress:
             return 0
-        return round(sum(task.progress for task in tasks) / tasks.count(), 2)
-
-
-class Milestone(models.Model):
-    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='milestones')
-    name = models.CharField(max_length=180)
-    description = models.TextField(blank=True)
-    deadline = models.DateField()
-    status = models.CharField(
-        max_length=20,
-        choices=Project.Status.choices,
-        default=Project.Status.PLANNING,
-    )
-
-    class Meta:
-        ordering = ['deadline', 'name']
-
-    def __str__(self):
-        return f'{self.project.name} - {self.name}'
+        return round(sum(task_progress) / len(task_progress))
 
 
 class Task(models.Model):
@@ -134,45 +137,14 @@ class Task(models.Model):
         LOW = 'low', 'Low'
         MEDIUM = 'medium', 'Medium'
         HIGH = 'high', 'High'
-        CRITICAL = 'critical', 'Critical'
 
     class Status(models.TextChoices):
-        TODO = 'todo', 'To Do'
+        PENDING = 'pending', 'Pending'
         IN_PROGRESS = 'in_progress', 'In Progress'
         SUBMITTED = 'submitted', 'Submitted for Approval'
-        REVIEW = 'review', 'In Review'
         COMPLETED = 'completed', 'Completed'
-        BLOCKED = 'blocked', 'Blocked'
 
-    class ApprovalStatus(models.TextChoices):
-        NOT_REQUIRED = 'not_required', 'Not Required'
-        PENDING = 'pending', 'Pending Approval'
-        APPROVED = 'approved', 'Approved'
-        REWORK = 'rework', 'Rework Requested'
-
-    title = models.CharField(max_length=200)
-    description = models.TextField()
-    project = models.ForeignKey(
-        Project,
-        on_delete=models.CASCADE,
-        related_name='tasks',
-        null=True,
-        blank=True,
-    )
-    milestone = models.ForeignKey(
-        Milestone,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='tasks',
-    )
-    assigned_to = models.ForeignKey(
-        Employee,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='tasks',
-    )
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='tasks')
     created_by = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,
@@ -180,66 +152,74 @@ class Task(models.Model):
         blank=True,
         related_name='created_tasks',
     )
-    required_skills = models.TextField(
+    title = models.CharField(max_length=180)
+    description = models.TextField(blank=True)
+    assigned_to = models.ForeignKey(
+        Employee,
+        on_delete=models.SET_NULL,
+        null=True,
         blank=True,
-        help_text='Comma-separated skills needed for the task.',
+        related_name='tasks',
     )
     deadline = models.DateField()
-    priority = models.CharField(max_length=20, choices=Priority.choices, default=Priority.MEDIUM)
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.TODO)
-    difficulty = models.PositiveIntegerField(
-        default=3,
-        validators=[MinValueValidator(1), MaxValueValidator(5)],
-        help_text='1 = simple, 5 = very complex',
-    )
+    priority = models.CharField(max_length=10, choices=Priority.choices, default=Priority.MEDIUM)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+    progress = models.PositiveIntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(100)])
+    required_skills = models.TextField(blank=True)
+    estimated_hours = models.DecimalField(max_digits=6, decimal_places=2, default=Decimal('8.00'))
+    difficulty = models.PositiveSmallIntegerField(default=1, validators=[MinValueValidator(1), MaxValueValidator(5)])
     requires_approval = models.BooleanField(default=False)
-    approval_status = models.CharField(
-        max_length=20,
-        choices=ApprovalStatus.choices,
-        default=ApprovalStatus.NOT_REQUIRED,
-    )
-    manager_remark = models.TextField(blank=True)
-    estimated_hours = models.DecimalField(max_digits=6, decimal_places=2, default=1)
-    progress = models.PositiveIntegerField(
-        default=0,
-        validators=[MinValueValidator(0), MaxValueValidator(100)],
-    )
     created_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
-        ordering = ['deadline', '-priority', 'title']
+        ordering = ['deadline', 'title']
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.title
 
     @property
-    def required_skill_list(self):
-        return [skill.strip().lower() for skill in self.required_skills.split(',') if skill.strip()]
+    def required_skill_list(self) -> list[str]:
+        return [item.strip().lower() for item in self.required_skills.split(',') if item.strip()]
 
     @property
-    def is_delayed(self):
-        today = timezone.localdate()
-        return self.status != self.Status.COMPLETED and self.deadline < today
+    def is_delayed(self) -> bool:
+        if self.status == self.Status.COMPLETED and self.completed_at:
+            return self.completed_at.date() > self.deadline
+        return self.status != self.Status.COMPLETED and timezone.localdate() > self.deadline
+
+    @property
+    def latest_approval_request(self):
+        return self.requests.filter(request_type=Request.Type.TASK_APPROVAL).order_by('-created_at').first()
+
+    def save(self, *args, **kwargs):
+        self.progress = max(0, min(int(self.progress or 0), 100))
+        if self.progress >= 100:
+            self.progress = 100
+            self.status = self.Status.SUBMITTED if self.requires_approval else self.Status.COMPLETED
+        elif self.progress > 0 and self.status == self.Status.PENDING:
+            self.status = self.Status.IN_PROGRESS
+
+        if self.status == self.Status.COMPLETED:
+            self.completed_at = self.completed_at or timezone.now()
+            self.progress = 100
+        elif self.status != self.Status.SUBMITTED:
+            self.completed_at = None
+        super().save(*args, **kwargs)
 
 
 class TaskLog(models.Model):
     task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name='logs')
     employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='task_logs')
-    hours_spent = models.DecimalField(max_digits=5, decimal_places=2)
+    hours_spent = models.DecimalField(max_digits=6, decimal_places=2)
     log_date = models.DateField(default=timezone.localdate)
     notes = models.TextField(blank=True)
-    progress_after_log = models.PositiveIntegerField(
-        default=0,
-        validators=[MinValueValidator(0), MaxValueValidator(100)],
-    )
-    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ['-log_date', '-created_at']
+        ordering = ['-log_date', '-id']
 
-    def __str__(self):
-        return f'{self.employee} - {self.task}'
+    def __str__(self) -> str:
+        return f'{self.task} - {self.employee} - {self.log_date}'
 
 
 class AIResult(models.Model):
@@ -248,153 +228,79 @@ class AIResult(models.Model):
     delay_risk = models.FloatField(default=0)
     suggestions = models.TextField(blank=True)
     recommended_action = models.TextField(blank=True)
-    skill_gap = models.TextField(blank=True)
-    learning_recommendations = models.TextField(blank=True)
-    workload_signal = models.CharField(max_length=40, blank=True)
-    burnout_score = models.FloatField(default=0)
+    workload_signal = models.CharField(max_length=50, blank=True)
     generated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ['-generated_at']
 
-    def __str__(self):
-        return f'AI result for {self.task}'
+    def __str__(self) -> str:
+        return f'AI Result for {self.task}'
 
 
-class PerformanceReview(models.Model):
-    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='performance_reviews')
-    manager = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='performance_reviews_written')
-    review_date = models.DateField(default=timezone.localdate)
-    rating = models.PositiveIntegerField(validators=[MinValueValidator(1), MaxValueValidator(5)])
-    remarks = models.TextField()
+class Request(models.Model):
+    class Type(models.TextChoices):
+        LEAVE = 'leave', 'Leave'
+        TASK_APPROVAL = 'task_approval', 'Task Approval'
+
+    class Status(models.TextChoices):
+        PENDING = 'pending', 'Pending'
+        APPROVED = 'approved', 'Approved'
+        REJECTED = 'rejected', 'Rejected'
+        REWORK = 'rework', 'Rework Required'
+
+    request_type = models.CharField(max_length=20, choices=Type.choices)
+    task = models.ForeignKey(Task, on_delete=models.CASCADE, null=True, blank=True, related_name='requests')
+    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='requests')
+    raised_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='raised_requests')
+    start_date = models.DateField(null=True, blank=True)
+    end_date = models.DateField(null=True, blank=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+    remarks = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    reviewed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='reviewed_requests')
+    reviewed_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
-        ordering = ['-review_date', '-id']
+        ordering = ['-created_at']
 
-    def __str__(self):
-        return f'Review for {self.employee} on {self.review_date}'
+    def __str__(self) -> str:
+        return f'{self.get_request_type_display()} - {self.employee}'
 
 
-class Notification(models.Model):
-    class Kind(models.TextChoices):
-        TASK = 'task', 'Task'
-        DEADLINE = 'deadline', 'Deadline'
-        DELAY = 'delay', 'Delay'
-        BURNOUT = 'burnout', 'Burnout'
-        APPROVAL = 'approval', 'Approval'
-        SYSTEM = 'system', 'System'
+class Activity(models.Model):
+    class Type(models.TextChoices):
+        NOTIFICATION = 'notification', 'Notification'
+        COMMENT = 'comment', 'Comment'
+        REVIEW = 'review', 'Review'
+        AUDIT = 'audit', 'Audit'
 
-    recipient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')
-    title = models.CharField(max_length=180)
+    activity_type = models.CharField(max_length=20, choices=Type.choices)
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='activities')
+    task = models.ForeignKey(Task, on_delete=models.CASCADE, null=True, blank=True, related_name='activities')
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, null=True, blank=True, related_name='activities')
+    title = models.CharField(max_length=180, blank=True)
     message = models.TextField()
-    kind = models.CharField(max_length=20, choices=Kind.choices, default=Kind.SYSTEM)
+    rating = models.PositiveSmallIntegerField(null=True, blank=True)
     is_read = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ['-created_at']
 
-    def __str__(self):
-        return f'{self.title} -> {self.recipient.username}'
+    def __str__(self) -> str:
+        return self.title or self.get_activity_type_display()
 
 
-class TaskComment(models.Model):
-    task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name='comments')
-    author = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='task_comments')
-    body = models.TextField()
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        ordering = ['-created_at']
-
-    def __str__(self):
-        return f'Comment on {self.task}'
-
-
-class TaskAttachment(models.Model):
+class Attachment(models.Model):
     task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name='attachments')
-    uploaded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='task_attachments')
+    uploaded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='attachments')
     file = models.FileField(upload_to='task_attachments/')
     label = models.CharField(max_length=180)
-    uploaded_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ['-uploaded_at']
+        ordering = ['-created_at']
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.label
-
-
-class LeaveRequest(models.Model):
-    class Status(models.TextChoices):
-        PENDING = 'pending', 'Pending'
-        APPROVED = 'approved', 'Approved'
-        REJECTED = 'rejected', 'Rejected'
-
-    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='leave_requests')
-    start_date = models.DateField()
-    end_date = models.DateField()
-    reason = models.TextField()
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
-    manager_note = models.TextField(blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        ordering = ['-created_at']
-
-    def __str__(self):
-        return f'{self.employee} leave {self.start_date} to {self.end_date}'
-
-
-class RecurringTask(models.Model):
-    class Frequency(models.TextChoices):
-        DAILY = 'daily', 'Daily'
-        WEEKLY = 'weekly', 'Weekly'
-        MONTHLY = 'monthly', 'Monthly'
-
-    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='recurring_tasks')
-    title = models.CharField(max_length=180)
-    description = models.TextField(blank=True)
-    assigned_to = models.ForeignKey(Employee, on_delete=models.SET_NULL, null=True, blank=True, related_name='recurring_tasks')
-    frequency = models.CharField(max_length=20, choices=Frequency.choices, default=Frequency.WEEKLY)
-    next_due_date = models.DateField()
-    is_active = models.BooleanField(default=True)
-
-    class Meta:
-        ordering = ['next_due_date', 'title']
-
-    def __str__(self):
-        return self.title
-
-
-class AuditLog(models.Model):
-    actor = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='audit_logs')
-    action = models.CharField(max_length=120)
-    entity_type = models.CharField(max_length=80)
-    entity_id = models.PositiveIntegerField()
-    details = models.TextField(blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        ordering = ['-created_at']
-
-    def __str__(self):
-        return f'{self.action} on {self.entity_type}#{self.entity_id}'
-
-
-class PerformanceMetric(models.Model):
-    employee = models.OneToOneField(Employee, on_delete=models.CASCADE, related_name='performance_metric')
-    tasks_completed = models.PositiveIntegerField(default=0)
-    avg_completion_time = models.FloatField(default=0)
-    delayed_tasks = models.PositiveIntegerField(default=0)
-    active_tasks = models.PositiveIntegerField(default=0)
-    average_daily_hours = models.FloatField(default=0)
-    burnout_risk = models.CharField(max_length=20, default='Low')
-    completion_rate = models.FloatField(default=0)
-    last_calculated = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        ordering = ['employee__name']
-
-    def __str__(self):
-        return f'Performance for {self.employee}'

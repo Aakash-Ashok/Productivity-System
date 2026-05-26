@@ -1,0 +1,643 @@
+<style>
+.task-page{
+    display:flex;
+    flex-direction:column;
+    gap:24px;
+}
+
+.task-hero{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:20px;
+    flex-wrap:wrap;
+    background:white;
+    padding:30px;
+    border-radius:24px;
+    box-shadow:0 10px 30px rgba(0,0,0,.05);
+}
+
+.hero-left{
+    flex:1;
+}
+
+.task-status-pill{
+    display:inline-block;
+    background:#eef2ff;
+    color:#4338ca;
+    padding:8px 14px;
+    border-radius:999px;
+    font-size:13px;
+    font-weight:600;
+    margin-bottom:12px;
+}
+
+.hero-left h1{
+    font-size:34px;
+    color:#0f172a;
+    margin-bottom:10px;
+}
+
+.hero-left p{
+    color:#64748b;
+    line-height:1.7;
+}
+
+.hero-actions{
+    display:flex;
+    gap:12px;
+    flex-wrap:wrap;
+}
+
+.primary-btn{
+    text-decoration:none;
+    background:linear-gradient(135deg,#4f46e5,#7c3aed);
+    color:white;
+    padding:12px 18px;
+    border-radius:12px;
+    font-weight:600;
+    transition:.25s;
+}
+
+.primary-btn:hover{
+    transform:translateY(-2px);
+}
+
+.secondary-btn{
+    text-decoration:none;
+    background:#f1f5f9;
+    color:#334155;
+    padding:12px 18px;
+    border-radius:12px;
+    font-weight:600;
+}
+
+.metric-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+    gap:20px;
+}
+
+.metric-card{
+    background:white;
+    padding:24px;
+    border-radius:20px;
+    box-shadow:0 10px 25px rgba(0,0,0,.05);
+}
+
+.metric-card span{
+    color:#64748b;
+    display:block;
+    margin-bottom:10px;
+}
+
+.metric-card h2{
+    margin:0;
+    color:#0f172a;
+}
+
+.progress-bar{
+    height:10px;
+    background:#e5e7eb;
+    border-radius:999px;
+    overflow:hidden;
+    margin-top:12px;
+}
+
+.progress-fill{
+    height:100%;
+    background:linear-gradient(90deg,#4f46e5,#8b5cf6);
+}
+
+.content-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(380px,1fr));
+    gap:20px;
+}
+
+.glass-card{
+    background:white;
+    padding:24px;
+    border-radius:24px;
+    box-shadow:0 10px 30px rgba(0,0,0,.05);
+}
+
+.glass-card h3,
+.ai-card h3{
+    margin-top:0;
+    margin-bottom:20px;
+    color:#0f172a;
+}
+
+.info-row{
+    display:flex;
+    justify-content:space-between;
+    gap:10px;
+    padding:12px 0;
+    border-bottom:1px solid #f1f5f9;
+}
+
+.info-row:last-child{
+    border-bottom:none;
+}
+
+.ai-card{
+    background:linear-gradient(135deg,#4f46e5,#7c3aed);
+    color:white;
+    padding:24px;
+    border-radius:24px;
+}
+
+.ai-row{
+    display:flex;
+    justify-content:space-between;
+    margin-bottom:15px;
+    gap:10px;
+}
+
+.risk-pill{
+    background:rgba(255,255,255,.18);
+    padding:6px 12px;
+    border-radius:999px;
+    font-size:13px;
+    font-weight:600;
+}
+
+.warning-box{
+    background:#fef2f2;
+    color:#dc2626;
+    padding:14px;
+    border-radius:12px;
+    margin-bottom:15px;
+    font-weight:600;
+}
+
+.suggestion-item{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:10px 0;
+}
+
+.score-pill{
+    background:#eef2ff;
+    color:#4338ca;
+    padding:6px 10px;
+    border-radius:999px;
+    font-size:12px;
+    font-weight:600;
+}
+
+.timeline-item{
+    display:flex;
+    gap:15px;
+    margin-bottom:18px;
+}
+
+.timeline-dot{
+    width:12px;
+    height:12px;
+    min-width:12px;
+    border-radius:50%;
+    background:#4f46e5;
+    margin-top:7px;
+}
+
+.card-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:20px;
+}
+
+.mini-btn{
+    text-decoration:none;
+    background:#eef2ff;
+    color:#4338ca;
+    padding:8px 12px;
+    border-radius:10px;
+    font-size:13px;
+    font-weight:600;
+}
+
+.comment-item{
+    display:flex;
+    gap:12px;
+    margin-bottom:16px;
+}
+
+.avatar-small{
+    width:40px;
+    height:40px;
+    border-radius:50%;
+    background:linear-gradient(135deg,#4f46e5,#8b5cf6);
+    color:white;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-weight:700;
+}
+
+.attachment-row{
+    padding:12px 0;
+    border-bottom:1px solid #f1f5f9;
+}
+
+.attachment-row:last-child{
+    border-bottom:none;
+}
+
+.attachment-row a{
+    color:#4338ca;
+    text-decoration:none;
+}
+
+.approval-status{
+    display:inline-block;
+    background:#fef3c7;
+    color:#92400e;
+    padding:6px 12px;
+    border-radius:999px;
+    margin-bottom:12px;
+    font-weight:600;
+}
+
+.skill-block p{
+    margin:12px 0;
+}
+
+@media(max-width:768px){
+
+    .task-hero{
+        padding:20px;
+    }
+
+    .hero-left h1{
+        font-size:28px;
+    }
+
+    .content-grid{
+        grid-template-columns:1fr;
+    }
+
+}
+</style>
+
+<div class="task-page">
+
+    <!-- Hero -->
+    <section class="task-hero">
+
+        <div class="hero-left">
+
+            <div class="task-status-pill">
+                {{ task.get_status_display }}
+            </div>
+
+            <h1>{{ task.title }}</h1>
+
+            <p>
+                {{ task.description|default:"No description provided." }}
+            </p>
+
+        </div>
+
+        <div class="hero-actions">
+
+            {% if can_manage_delivery %}
+            <a href="{% url 'task-update' task.pk %}"
+               class="secondary-btn">
+                Edit Task
+            </a>
+            {% endif %}
+
+            {% if can_log_work %}
+            <a href="{% url 'tasklog-create' %}?task={{ task.pk }}"
+               class="primary-btn">
+                Log Work
+            </a>
+            {% endif %}
+
+        </div>
+
+    </section>
+
+    <!-- Metrics -->
+    <section class="metric-grid">
+
+        <div class="metric-card">
+            <span>Status</span>
+            <h2>{{ task.get_status_display }}</h2>
+        </div>
+
+        <div class="metric-card">
+            <span>Progress</span>
+            <h2>{{ task.progress }}%</h2>
+
+            <div class="progress-bar">
+                <div class="progress-fill"
+                     style="width:{{ task.progress }}%">
+                </div>
+            </div>
+        </div>
+
+        <div class="metric-card">
+            <span>Deadline</span>
+            <h2>{{ task.deadline }}</h2>
+        </div>
+
+        <div class="metric-card">
+            <span>Priority</span>
+            <h2>{{ task.get_priority_display }}</h2>
+        </div>
+
+    </section>
+
+    <!-- Main Cards -->
+    <section class="content-grid">
+
+        <!-- Assignment -->
+        <article class="glass-card">
+
+            <h3>Assignment Information</h3>
+
+            <div class="info-row">
+                <strong>Project</strong>
+                <span>{{ task.project.name }}</span>
+            </div>
+
+            <div class="info-row">
+                <strong>Employee</strong>
+                <span>{{ task.assigned_to.name|default:"Unassigned" }}</span>
+            </div>
+
+            <div class="info-row">
+                <strong>Required Skills</strong>
+                <span>{{ task.required_skills|default:"-" }}</span>
+            </div>
+
+            {% if allocation_suggestions %}
+
+            <h4>Smart Allocation Suggestions</h4>
+
+            {% for item in allocation_suggestions %}
+            <div class="suggestion-item">
+                <span>{{ item.employee.name }}</span>
+                <span class="score-pill">
+                    {{ item.score }}%
+                </span>
+            </div>
+            {% endfor %}
+
+            {% endif %}
+
+        </article>
+
+        <!-- AI Insight -->
+        <article class="ai-card">
+
+            <h3>AI Task Intelligence</h3>
+
+            <div class="ai-row">
+                <span>Predicted Time</span>
+                <strong>{{ ai_result.predicted_time }}h</strong>
+            </div>
+
+            <div class="ai-row">
+                <span>Delay Risk</span>
+                <span class="risk-pill">
+                    {{ delay_risk.label }}
+                    ({{ delay_risk.probability }}%)
+                </span>
+            </div>
+
+            <div class="ai-row">
+                <span>Recommendation</span>
+                <strong>{{ ai_result.recommended_action }}</strong>
+            </div>
+
+            <hr>
+
+            <div class="skill-block">
+
+                <p>
+                    <strong>Matched Skills:</strong>
+                    {{ skill_gap.matched_skills|join:", "|default:"-" }}
+                </p>
+
+                <p>
+                    <strong>Missing Skills:</strong>
+                    {{ skill_gap.missing_skills|join:", "|default:"-" }}
+                </p>
+
+                <p>
+                    <strong>Training:</strong>
+                    {{ skill_gap.recommended_training|join:", "|default:"-" }}
+                </p>
+
+            </div>
+
+        </article>
+
+        <!-- AI Signals -->
+        <article class="glass-card">
+
+            <h3>Advanced AI Signals</h3>
+
+            <div class="warning-box">
+                {{ task_anomaly.label }}
+                ({{ task_anomaly.score }}%)
+            </div>
+
+            <ul>
+                {% for signal in task_anomaly.signals %}
+                <li>{{ signal }}</li>
+                {% endfor %}
+            </ul>
+
+            <div class="info-row">
+                <span>Project Health</span>
+                <strong>{{ project_ai.health_score }}/100</strong>
+            </div>
+
+            <div class="info-row">
+                <span>Completion Confidence</span>
+                <strong>{{ project_ai.completion_confidence }}%</strong>
+            </div>
+
+            <div class="info-row">
+                <span>Recommendation</span>
+                <strong>{{ project_ai.recommended_action }}</strong>
+            </div>
+
+            {% if employee_ai_profile %}
+
+            <div class="info-row">
+                <span>Productivity</span>
+                <strong>
+                    {{ employee_ai_profile.productivity_score }}/100
+                </strong>
+            </div>
+
+            <div class="info-row">
+                <span>Focus Area</span>
+                <strong>
+                    {{ employee_ai_profile.focus_area }}
+                </strong>
+            </div>
+
+            {% endif %}
+
+        </article>
+
+        <!-- Approval -->
+        <article class="glass-card">
+
+            <h3>Approval Workflow</h3>
+
+            {% if approval_request %}
+
+                <div class="approval-status">
+                    {{ approval_request.get_status_display }}
+                </div>
+
+                <p>
+                    {{ approval_request.remarks|default:"No remarks." }}
+                </p>
+
+                {% if can_manage_delivery and approval_request.status == 'pending' %}
+
+                <a href="{% url 'task-approve' task.pk %}"
+                   class="primary-btn">
+                    Review Approval
+                </a>
+
+                {% endif %}
+
+            {% else %}
+
+                <p>
+                    No approval request recorded.
+                </p>
+
+            {% endif %}
+
+        </article>
+
+    </section>
+
+    <!-- Bottom Cards -->
+    <section class="content-grid">
+
+        <!-- Work Logs -->
+        <article class="glass-card">
+
+            <h3>Work Log Timeline</h3>
+
+            {% for log in logs %}
+
+            <div class="timeline-item">
+
+                <div class="timeline-dot"></div>
+
+                <div>
+
+                    <strong>
+                        {{ log.employee.name }}
+                    </strong>
+
+                    <p>
+                        {{ log.hours_spent }} hours
+                    </p>
+
+                    <small>
+                        {{ log.log_date }}
+                    </small>
+
+                </div>
+
+            </div>
+
+            {% empty %}
+            <p>No work logs yet.</p>
+            {% endfor %}
+
+        </article>
+
+        <!-- Comments -->
+        <article class="glass-card">
+
+            <div class="card-head">
+
+                <h3>Comments</h3>
+
+                <a href="{% url 'task-comment-create' task.pk %}"
+                   class="mini-btn">
+                    Add Comment
+                </a>
+
+            </div>
+
+            {% for comment in comments %}
+
+            <div class="comment-item">
+
+                <div class="avatar-small">
+                    {{ comment.user.username|first|upper }}
+                </div>
+
+                <div>
+
+                    <strong>
+                        {{ comment.user.username|default:"System" }}
+                    </strong>
+
+                    <p>
+                        {{ comment.message }}
+                    </p>
+
+                </div>
+
+            </div>
+
+            {% empty %}
+            <p>No comments yet.</p>
+            {% endfor %}
+
+        </article>
+
+        <!-- Attachments -->
+        <article class="glass-card">
+
+            <div class="card-head">
+
+                <h3>Attachments</h3>
+
+                <a href="{% url 'task-attachment-create' task.pk %}"
+                   class="mini-btn">
+                    Upload
+                </a>
+
+            </div>
+
+            {% for attachment in attachments %}
+
+            <div class="attachment-row">
+
+                📎
+
+                <a href="{{ attachment.file.url }}">
+                    {{ attachment.label }}
+                </a>
+
+            </div>
+
+            {% empty %}
+            <p>No attachments uploaded.</p>
+            {% endfor %}
+
+        </article>
+
+    </section>
+
+</div>

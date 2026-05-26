@@ -1,0 +1,362 @@
+<style>
+.user-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    flex-wrap:wrap;
+    gap:15px;
+    margin-bottom:25px;
+}
+
+.user-title h1{
+    font-size:32px;
+    color:#0f172a;
+    margin-bottom:6px;
+}
+
+.user-title p{
+    color:#64748b;
+}
+
+.create-user-btn{
+    background:linear-gradient(135deg,#4f46e5,#7c3aed);
+    color:white;
+    text-decoration:none;
+    padding:12px 18px;
+    border-radius:12px;
+    font-weight:600;
+    transition:.3s;
+}
+
+.create-user-btn:hover{
+    transform:translateY(-2px);
+    box-shadow:0 10px 25px rgba(79,70,229,.25);
+}
+
+.user-stats{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+    gap:18px;
+    margin-bottom:25px;
+}
+
+.stat-card{
+    background:white;
+    border-radius:18px;
+    padding:22px;
+    text-align:center;
+    box-shadow:0 10px 25px rgba(0,0,0,.05);
+}
+
+.stat-number{
+    font-size:32px;
+    font-weight:700;
+    color:#4f46e5;
+}
+
+.stat-label{
+    margin-top:5px;
+    color:#64748b;
+}
+
+.user-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(350px,1fr));
+    gap:20px;
+}
+
+.user-card{
+    background:white;
+    border-radius:24px;
+    padding:24px;
+    box-shadow:0 10px 30px rgba(0,0,0,.05);
+    transition:.3s;
+    border:1px solid #eef2ff;
+}
+
+.user-card:hover{
+    transform:translateY(-4px);
+    box-shadow:0 15px 35px rgba(0,0,0,.08);
+}
+
+.user-top{
+    display:flex;
+    align-items:center;
+    gap:15px;
+    margin-bottom:18px;
+}
+
+.user-avatar{
+    width:60px;
+    height:60px;
+    border-radius:18px;
+    background:linear-gradient(135deg,#4f46e5,#8b5cf6);
+    color:white;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:22px;
+    font-weight:700;
+}
+
+.user-name{
+    font-size:18px;
+    font-weight:700;
+    color:#0f172a;
+}
+
+.user-email{
+    color:#64748b;
+    font-size:14px;
+}
+
+.role-badge{
+    display:inline-block;
+    margin-top:8px;
+    padding:6px 12px;
+    border-radius:999px;
+    font-size:12px;
+    font-weight:600;
+}
+
+.role-admin{
+    background:#fee2e2;
+    color:#b91c1c;
+}
+
+.role-manager{
+    background:#dbeafe;
+    color:#1d4ed8;
+}
+
+.role-employee{
+    background:#dcfce7;
+    color:#166534;
+}
+
+.status-badge{
+    display:inline-block;
+    margin-top:12px;
+    padding:6px 12px;
+    border-radius:999px;
+    font-size:12px;
+    font-weight:600;
+}
+
+.status-active{
+    background:#dcfce7;
+    color:#166534;
+}
+
+.status-inactive{
+    background:#fee2e2;
+    color:#b91c1c;
+}
+
+.user-footer{
+    display:flex;
+    gap:10px;
+    margin-top:20px;
+    padding-top:15px;
+    border-top:1px solid #e5e7eb;
+}
+
+.edit-btn{
+    text-decoration:none;
+    background:#eef2ff;
+    color:#4338ca;
+    padding:10px 14px;
+    border-radius:10px;
+    font-weight:600;
+}
+
+.toggle-btn{
+    border:none;
+    cursor:pointer;
+    padding:10px 14px;
+    border-radius:10px;
+    font-weight:600;
+}
+
+.activate-btn{
+    background:#dcfce7;
+    color:#166534;
+}
+
+.deactivate-btn{
+    background:#fee2e2;
+    color:#b91c1c;
+}
+
+.empty-state{
+    background:white;
+    border-radius:24px;
+    padding:70px 20px;
+    text-align:center;
+    box-shadow:0 10px 30px rgba(0,0,0,.05);
+}
+
+.empty-state-icon{
+    font-size:60px;
+    margin-bottom:15px;
+}
+
+.empty-state h3{
+    color:#334155;
+    margin-bottom:10px;
+}
+
+.empty-state p{
+    color:#64748b;
+}
+
+@media(max-width:768px){
+    .user-grid{
+        grid-template-columns:1fr;
+    }
+}
+</style>
+
+<!-- Header -->
+<section class="user-header">
+
+    <div class="user-title">
+
+        <h1>Users</h1>
+
+        <p>
+            Manage login accounts, roles and system access permissions.
+        </p>
+
+    </div>
+
+    <a href="{% url 'user-create' %}"
+       class="create-user-btn">
+        + Create User
+    </a>
+
+</section>
+
+<!-- Stats -->
+<section class="user-stats">
+
+    <div class="stat-card">
+        <div class="stat-number">
+            {{ user_rows|length }}
+        </div>
+        <div class="stat-label">
+            Total Users
+        </div>
+    </div>
+
+</section>
+
+<!-- Users -->
+{% if user_rows %}
+
+<section class="user-grid">
+
+{% for row in user_rows %}
+
+<article class="user-card">
+
+    <div class="user-top">
+
+        <div class="user-avatar">
+            {{ row.username|first|upper }}
+        </div>
+
+        <div>
+
+            <div class="user-name">
+                {{ row.username }}
+            </div>
+
+            <div class="user-email">
+                {{ row.email }}
+            </div>
+
+            {% if row.role == 'admin' %}
+                <span class="role-badge role-admin">
+                    Administrator
+                </span>
+
+            {% elif row.role == 'manager' %}
+                <span class="role-badge role-manager">
+                    Manager
+                </span>
+
+            {% else %}
+                <span class="role-badge role-employee">
+                    Employee
+                </span>
+            {% endif %}
+
+        </div>
+
+    </div>
+
+    {% if row.is_active %}
+
+        <span class="status-badge status-active">
+            Active Account
+        </span>
+
+    {% else %}
+
+        <span class="status-badge status-inactive">
+            Inactive Account
+        </span>
+
+    {% endif %}
+
+    <div class="user-footer">
+
+        <a href="{% url 'user-update' row.id %}"
+           class="edit-btn">
+            Edit User
+        </a>
+
+        <form method="post"
+              action="{% url 'user-toggle-active' row.id %}">
+
+            {% csrf_token %}
+
+            <button type="submit"
+                class="toggle-btn {% if row.is_active %}deactivate-btn{% else %}activate-btn{% endif %}">
+
+                {% if row.is_active %}
+                    Deactivate
+                {% else %}
+                    Activate
+                {% endif %}
+
+            </button>
+
+        </form>
+
+    </div>
+
+</article>
+
+{% endfor %}
+
+</section>
+
+{% else %}
+
+<div class="empty-state">
+
+    <div class="empty-state-icon">
+        👤
+    </div>
+
+    <h3>No Users Found</h3>
+
+    <p>
+        Create user accounts to grant access to the Productivity System.
+    </p>
+
+</div>
+
+{% endif %}

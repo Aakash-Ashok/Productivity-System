@@ -1,0 +1,410 @@
+<style>
+.dashboard-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:30px;
+    flex-wrap:wrap;
+    gap:20px;
+}
+
+.dashboard-title h1{
+    font-size:32px;
+    color:#1e293b;
+    margin-bottom:8px;
+}
+
+.dashboard-title p{
+    color:#64748b;
+}
+
+.role-badge{
+    background:linear-gradient(135deg,#6366f1,#8b5cf6);
+    color:white;
+    padding:10px 18px;
+    border-radius:50px;
+    font-weight:600;
+}
+
+.stats-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+    gap:20px;
+    margin-bottom:30px;
+}
+
+.stat-card{
+    background:#fff;
+    border-radius:18px;
+    padding:24px;
+    box-shadow:0 10px 30px rgba(0,0,0,.06);
+    transition:.3s;
+    border:1px solid #eef2ff;
+}
+
+.stat-card:hover{
+    transform:translateY(-5px);
+}
+
+.stat-card span{
+    display:block;
+    color:#64748b;
+    margin-bottom:10px;
+    font-size:14px;
+}
+
+.stat-card strong{
+    font-size:32px;
+    color:#111827;
+}
+
+.panel-grid{
+    display:grid;
+    grid-template-columns:2fr 1fr;
+    gap:20px;
+    margin-bottom:20px;
+}
+
+.panel{
+    background:white;
+    border-radius:18px;
+    padding:24px;
+    box-shadow:0 10px 30px rgba(0,0,0,.06);
+}
+
+.panel h3{
+    margin-bottom:20px;
+    color:#1e293b;
+}
+
+.table{
+    width:100%;
+    border-collapse:collapse;
+}
+
+.table th{
+    background:#f8fafc;
+    text-align:left;
+    padding:14px;
+    color:#475569;
+}
+
+.table td{
+    padding:14px;
+    border-top:1px solid #e5e7eb;
+}
+
+.table a{
+    text-decoration:none;
+    color:#4f46e5;
+    font-weight:600;
+}
+
+.list-item{
+    padding:12px 0;
+    border-bottom:1px solid #f1f5f9;
+}
+
+.list-item:last-child{
+    border-bottom:none;
+}
+
+.badge{
+    display:inline-block;
+    padding:4px 10px;
+    border-radius:999px;
+    background:#eef2ff;
+    color:#4f46e5;
+    font-size:12px;
+    font-weight:600;
+}
+
+.ai-card{
+    background:linear-gradient(135deg,#4f46e5,#7c3aed);
+    color:white;
+    border-radius:18px;
+    padding:24px;
+}
+
+.ai-card h3{
+    color:white;
+    margin-bottom:20px;
+}
+
+.ai-card p{
+    margin-bottom:10px;
+}
+
+@media(max-width:992px){
+    .panel-grid{
+        grid-template-columns:1fr;
+    }
+}
+</style>
+
+<div class="dashboard-header">
+
+    <div class="dashboard-title">
+        <h1>Dashboard</h1>
+        <p>Role-aware summary of teams, projects, tasks, requests and activity.</p>
+    </div>
+
+    <div class="role-badge">
+        {{ dashboard_role|title }}
+    </div>
+
+</div>
+
+<section class="stats-grid">
+
+{% if dashboard_role == 'admin' %}
+
+<div class="stat-card">
+    <span>Total Teams</span>
+    <strong>{{ total_teams|default:0 }}</strong>
+</div>
+
+<div class="stat-card">
+    <span>Total Employees</span>
+    <strong>{{ total_employees|default:0 }}</strong>
+</div>
+
+<div class="stat-card">
+    <span>Total Projects</span>
+    <strong>{{ total_projects|default:0 }}</strong>
+</div>
+
+<div class="stat-card">
+    <span>Total Tasks</span>
+    <strong>{{ total_tasks|default:0 }}</strong>
+</div>
+
+<div class="stat-card">
+    <span>Completed Tasks</span>
+    <strong>{{ completed_tasks|default:0 }}</strong>
+</div>
+
+<div class="stat-card">
+    <span>Delayed Tasks</span>
+    <strong>{{ delayed_tasks|default:0 }}</strong>
+</div>
+
+{% elif dashboard_role == 'manager' %}
+
+<div class="stat-card">
+    <span>Managed Teams</span>
+    <strong>{{ managed_teams|length }}</strong>
+</div>
+
+<div class="stat-card">
+    <span>Projects</span>
+    <strong>{{ managed_projects|length }}</strong>
+</div>
+
+<div class="stat-card">
+    <span>Team Members</span>
+    <strong>{{ team_members|length }}</strong>
+</div>
+
+<div class="stat-card">
+    <span>Pending Approvals</span>
+    <strong>{{ pending_approvals|length }}</strong>
+</div>
+
+<div class="stat-card">
+    <span>Leave Requests</span>
+    <strong>{{ team_leave_requests|length }}</strong>
+</div>
+
+{% else %}
+
+<div class="stat-card">
+    <span>Assigned Tasks</span>
+    <strong>{{ my_tasks|length }}</strong>
+</div>
+
+<div class="stat-card">
+    <span>Completed Tasks</span>
+    <strong>{{ my_completed_tasks|default:0 }}</strong>
+</div>
+
+<div class="stat-card">
+    <span>Pending Tasks</span>
+    <strong>{{ my_pending_tasks|default:0 }}</strong>
+</div>
+
+<div class="stat-card">
+    <span>Recent Logs</span>
+    <strong>{{ my_logs|length }}</strong>
+</div>
+
+{% endif %}
+
+</section>
+
+<section class="panel-grid">
+
+<div class="panel">
+
+    <h3>Recent Tasks</h3>
+
+    <table class="table">
+
+        <thead>
+            <tr>
+                <th>Task</th>
+                <th>Project</th>
+                <th>Status</th>
+                <th>Deadline</th>
+            </tr>
+        </thead>
+
+        <tbody>
+
+        {% for task in recent_tasks %}
+            <tr>
+                <td>
+                    <a href="{% url 'task-detail' task.pk %}">
+                        {{ task.title }}
+                    </a>
+                </td>
+                <td>{{ task.project.name }}</td>
+                <td>
+                    <span class="badge">
+                        {{ task.get_status_display }}
+                    </span>
+                </td>
+                <td>{{ task.deadline }}</td>
+            </tr>
+        {% empty %}
+            <tr>
+                <td colspan="4">No tasks available.</td>
+            </tr>
+        {% endfor %}
+
+        </tbody>
+
+    </table>
+
+</div>
+
+<div class="panel">
+
+    <h3>Notifications</h3>
+
+    {% for item in notifications %}
+        <div class="list-item">
+            <strong>{{ item.title|default:"Update" }}</strong>
+            <br>
+            {{ item.message }}
+        </div>
+    {% empty %}
+        <p>No notifications.</p>
+    {% endfor %}
+
+</div>
+
+</section>
+
+<section class="panel-grid">
+
+<div class="panel">
+
+    <h3>Recent Requests</h3>
+
+    {% for item in recent_requests %}
+        <div class="list-item">
+
+            <strong>
+                {{ item.get_request_type_display }}
+            </strong>
+
+            {% if item.task %}
+                for {{ item.task.title }}
+            {% endif %}
+
+            <br>
+
+            <span class="badge">
+                {{ item.get_status_display }}
+            </span>
+
+        </div>
+
+    {% empty %}
+        <p>No requests available.</p>
+    {% endfor %}
+
+</div>
+
+{% if dashboard_role == 'admin' %}
+
+<div class="panel">
+
+    <h3>Project Risk Analysis</h3>
+
+    {% for row in top_risky_projects %}
+        <div class="list-item">
+            <strong>{{ row.project.name }}</strong>
+            <br>
+            Delay Risk:
+            {{ row.delay_risk }}%
+            |
+            Confidence:
+            {{ row.completion_confidence }}%
+        </div>
+    {% empty %}
+        <p>No project risk rows available.</p>
+    {% endfor %}
+
+</div>
+
+{% elif dashboard_role == 'manager' %}
+
+<div class="panel">
+
+    <h3>Team Health</h3>
+
+    {% for row in team_health_rows %}
+        <div class="list-item">
+            <strong>{{ row.team.name }}</strong>
+            <br>
+            {{ row.recommended_action }}
+        </div>
+    {% empty %}
+        <p>No team health summary available.</p>
+    {% endfor %}
+
+</div>
+
+{% elif dashboard_role == 'employee' and my_ai_profile %}
+
+<div class="ai-card">
+
+    <h3>My AI Profile</h3>
+
+    <p>
+        <strong>Productivity Score:</strong>
+        {{ my_ai_profile.productivity_score }}/100
+    </p>
+
+    <p>
+        <strong>Burnout Risk:</strong>
+        {{ my_ai_profile.burnout_risk }}
+    </p>
+
+    <p>
+        <strong>Focus Area:</strong>
+        {{ my_ai_profile.focus_area }}
+    </p>
+
+    <p>
+        <strong>Learning Priority:</strong>
+        {{ my_ai_profile.learning_priority|join:", "|default:"-" }}
+    </p>
+
+</div>
+
+{% endif %}
+
+</section>

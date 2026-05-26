@@ -20,12 +20,11 @@
                 <p class="nav-group">Employee</p>
                 <a class="{% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}">Dashboard</a>
                 <a class="{% if request.resolver_match.url_name == 'task-list' or request.resolver_match.url_name == 'task-detail' or request.resolver_match.url_name == 'task-update' %}active{% endif %}" href="{% url 'task-list' %}">My Tasks</a>
-                <a class="{% if request.resolver_match.url_name == 'planning-hub' or request.resolver_match.url_name == 'milestone-list' or request.resolver_match.url_name == 'recurring-task-list' or request.resolver_match.url_name == 'kanban-board' or request.resolver_match.url_name == 'calendar-view' %}active{% endif %}" href="{% url 'planning-hub' %}">Planning</a>
+                <a class="{% if request.resolver_match.url_name == 'planning-hub' or request.resolver_match.url_name == 'kanban-board' or request.resolver_match.url_name == 'calendar-view' %}active{% endif %}" href="{% url 'planning-hub' %}">Planning</a>
                 <a class="{% if request.resolver_match.url_name == 'tasklog-create' %}active{% endif %}" href="{% url 'tasklog-create' %}">Log Work</a>
-                <a class="{% if request.resolver_match.url_name == 'leave-request-list' or request.resolver_match.url_name == 'leave-request-create' %}active{% endif %}" href="{% url 'leave-request-list' %}">Leave</a>
-                <a class="{% if request.resolver_match.url_name == 'performance-review-list' %}active{% endif %}" href="{% url 'performance-review-list' %}">Reviews</a>
+                <a class="{% if request.resolver_match.url_name == 'leave-request-list' or request.resolver_match.url_name == 'leave-request-create' %}active{% endif %}" href="{% url 'leave-request-list' %}">Requests</a>
+                <a class="{% if request.resolver_match.url_name == 'performance-review-list' or request.resolver_match.url_name == 'notification-list' %}active{% endif %}" href="{% url 'notification-list' %}">Activities</a>
                 <a class="{% if request.resolver_match.url_name == 'analytics' %}active{% endif %}" href="{% url 'analytics' %}">AI Insights</a>
-                <a class="{% if request.resolver_match.url_name == 'notification-list' %}active{% endif %}" href="{% url 'notification-list' %}">Notifications</a>
             </nav>
             <div class="sidebar-footer">
                 {% if user.is_authenticated %}

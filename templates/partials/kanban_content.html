@@ -1,0 +1,362 @@
+<style>
+.kanban-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:25px;
+    flex-wrap:wrap;
+    gap:15px;
+}
+
+.kanban-title h1{
+    font-size:32px;
+    color:#0f172a;
+    margin-bottom:6px;
+}
+
+.kanban-title p{
+    color:#64748b;
+}
+
+.kanban-badge{
+    background:linear-gradient(135deg,#4f46e5,#7c3aed);
+    color:white;
+    padding:12px 18px;
+    border-radius:999px;
+    font-weight:600;
+}
+
+.kanban-board{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:20px;
+}
+
+.kanban-column{
+    background:#f8fafc;
+    border-radius:20px;
+    padding:18px;
+    min-height:600px;
+}
+
+.column-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:18px;
+}
+
+.column-title{
+    font-weight:700;
+    color:#0f172a;
+}
+
+.column-count{
+    width:28px;
+    height:28px;
+    border-radius:50%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:12px;
+    font-weight:600;
+    color:white;
+}
+
+.pending-count{
+    background:#f59e0b;
+}
+
+.progress-count{
+    background:#3b82f6;
+}
+
+.submitted-count{
+    background:#8b5cf6;
+}
+
+.completed-count{
+    background:#22c55e;
+}
+
+.task-list{
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+}
+
+.task-card{
+    background:white;
+    border-radius:16px;
+    padding:16px;
+    box-shadow:0 4px 15px rgba(0,0,0,.05);
+    transition:.25s;
+    border-left:4px solid transparent;
+}
+
+.task-card:hover{
+    transform:translateY(-3px);
+    box-shadow:0 10px 25px rgba(0,0,0,.08);
+}
+
+.task-card.pending{
+    border-color:#f59e0b;
+}
+
+.task-card.progress{
+    border-color:#3b82f6;
+}
+
+.task-card.submitted{
+    border-color:#8b5cf6;
+}
+
+.task-card.completed{
+    border-color:#22c55e;
+}
+
+.task-card a{
+    text-decoration:none;
+    color:#0f172a;
+    font-weight:600;
+    display:block;
+    margin-bottom:10px;
+}
+
+.task-meta{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    font-size:12px;
+    color:#64748b;
+}
+
+.status-pill{
+    padding:4px 10px;
+    border-radius:999px;
+    font-size:11px;
+    font-weight:600;
+}
+
+.pending-pill{
+    background:#fef3c7;
+    color:#92400e;
+}
+
+.progress-pill{
+    background:#dbeafe;
+    color:#1d4ed8;
+}
+
+.submitted-pill{
+    background:#ede9fe;
+    color:#6d28d9;
+}
+
+.completed-pill{
+    background:#dcfce7;
+    color:#166534;
+}
+
+.empty-card{
+    background:white;
+    border:2px dashed #d1d5db;
+    border-radius:14px;
+    padding:20px;
+    text-align:center;
+    color:#94a3b8;
+}
+
+@media(max-width:1200px){
+    .kanban-board{
+        grid-template-columns:repeat(2,1fr);
+    }
+}
+
+@media(max-width:768px){
+    .kanban-board{
+        grid-template-columns:1fr;
+    }
+}
+</style>
+
+<!-- Header -->
+<section class="kanban-header">
+
+    <div class="kanban-title">
+        <h1>Kanban Board</h1>
+        <p>
+            Visual workflow management for all visible tasks.
+        </p>
+    </div>
+
+    <div class="kanban-badge">
+        Total Tasks: {{ tasks|length }}
+    </div>
+
+</section>
+
+<!-- Board -->
+<section class="kanban-board">
+
+    <!-- Pending -->
+    <div class="kanban-column">
+
+        <div class="column-header">
+            <span class="column-title">Pending</span>
+            <span class="column-count pending-count">
+                {{ pending_tasks|default:"0" }}
+            </span>
+        </div>
+
+        <div class="task-list">
+
+            {% for task in tasks %}
+            {% if task.status == 'pending' %}
+
+            <div class="task-card pending">
+
+                <a href="{% url 'task-detail' task.pk %}">
+                    {{ task.title }}
+                </a>
+
+                <div class="task-meta">
+                    <span>
+                        {{ task.deadline }}
+                    </span>
+
+                    <span class="status-pill pending-pill">
+                        Pending
+                    </span>
+                </div>
+
+            </div>
+
+            {% endif %}
+            {% empty %}
+
+            <div class="empty-card">
+                No pending tasks
+            </div>
+
+            {% endfor %}
+
+        </div>
+
+    </div>
+
+    <!-- In Progress -->
+    <div class="kanban-column">
+
+        <div class="column-header">
+            <span class="column-title">In Progress</span>
+            <span class="column-count progress-count">
+                {{ in_progress_tasks|default:"0" }}
+            </span>
+        </div>
+
+        <div class="task-list">
+
+            {% for task in tasks %}
+            {% if task.status == 'in_progress' %}
+
+            <div class="task-card progress">
+
+                <a href="{% url 'task-detail' task.pk %}">
+                    {{ task.title }}
+                </a>
+
+                <div class="task-meta">
+                    <span>{{ task.deadline }}</span>
+
+                    <span class="status-pill progress-pill">
+                        In Progress
+                    </span>
+                </div>
+
+            </div>
+
+            {% endif %}
+            {% endfor %}
+
+        </div>
+
+    </div>
+
+    <!-- Submitted -->
+    <div class="kanban-column">
+
+        <div class="column-header">
+            <span class="column-title">Submitted</span>
+            <span class="column-count submitted-count">
+                {{ submitted_tasks|default:"0" }}
+            </span>
+        </div>
+
+        <div class="task-list">
+
+            {% for task in tasks %}
+            {% if task.status == 'submitted' %}
+
+            <div class="task-card submitted">
+
+                <a href="{% url 'task-detail' task.pk %}">
+                    {{ task.title }}
+                </a>
+
+                <div class="task-meta">
+                    <span>{{ task.deadline }}</span>
+
+                    <span class="status-pill submitted-pill">
+                        Submitted
+                    </span>
+                </div>
+
+            </div>
+
+            {% endif %}
+            {% endfor %}
+
+        </div>
+
+    </div>
+
+    <!-- Completed -->
+    <div class="kanban-column">
+
+        <div class="column-header">
+            <span class="column-title">Completed</span>
+            <span class="column-count completed-count">
+                {{ completed_tasks|default:"0" }}
+            </span>
+        </div>
+
+        <div class="task-list">
+
+            {% for task in tasks %}
+            {% if task.status == 'completed' %}
+
+            <div class="task-card completed">
+
+                <a href="{% url 'task-detail' task.pk %}">
+                    {{ task.title }}
+                </a>
+
+                <div class="task-meta">
+                    <span>{{ task.deadline }}</span>
+
+                    <span class="status-pill completed-pill">
+                        Completed
+                    </span>
+                </div>
+
+            </div>
+
+            {% endif %}
+            {% endfor %}
+
+        </div>
+
+    </div>
+
+</section>

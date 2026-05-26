@@ -22,12 +22,10 @@
                 <a class="{% if request.resolver_match.url_name == 'employee-list' or request.resolver_match.url_name == 'employee-update' %}active{% endif %}" href="{% url 'employee-list' %}">Team</a>
                 <a class="{% if request.resolver_match.url_name == 'project-list' or request.resolver_match.url_name == 'project-update' %}active{% endif %}" href="{% url 'project-list' %}">Projects</a>
                 <a class="{% if request.resolver_match.url_name == 'task-list' or request.resolver_match.url_name == 'task-create' or request.resolver_match.url_name == 'task-update' or request.resolver_match.url_name == 'task-detail' %}active{% endif %}" href="{% url 'task-list' %}">Tasks</a>
-                <a class="{% if request.resolver_match.url_name == 'planning-hub' or request.resolver_match.url_name == 'milestone-list' or request.resolver_match.url_name == 'milestone-create' or request.resolver_match.url_name == 'recurring-task-list' or request.resolver_match.url_name == 'recurring-task-create' or request.resolver_match.url_name == 'kanban-board' or request.resolver_match.url_name == 'calendar-view' %}active{% endif %}" href="{% url 'planning-hub' %}">Planning</a>
-                <a class="{% if request.resolver_match.url_name == 'approval-queue' or request.resolver_match.url_name == 'task-approve' %}active{% endif %}" href="{% url 'approval-queue' %}">Manager Approval Queue</a>
-                <a class="{% if request.resolver_match.url_name == 'performance-review-list' or request.resolver_match.url_name == 'performance-review-create' %}active{% endif %}" href="{% url 'performance-review-list' %}">Reviews</a>
-                <a class="{% if request.resolver_match.url_name == 'leave-request-list' or request.resolver_match.url_name == 'leave-request-review' %}active{% endif %}" href="{% url 'leave-request-list' %}">Leave</a>
+                <a class="{% if request.resolver_match.url_name == 'planning-hub' or request.resolver_match.url_name == 'kanban-board' or request.resolver_match.url_name == 'calendar-view' %}active{% endif %}" href="{% url 'planning-hub' %}">Planning</a>
+                <a class="{% if request.resolver_match.url_name == 'approval-queue' or request.resolver_match.url_name == 'task-approve' or request.resolver_match.url_name == 'leave-request-list' or request.resolver_match.url_name == 'leave-request-review' %}active{% endif %}" href="{% url 'approval-queue' %}">Requests</a>
+                <a class="{% if request.resolver_match.url_name == 'performance-review-list' or request.resolver_match.url_name == 'performance-review-create' or request.resolver_match.url_name == 'notification-list' %}active{% endif %}" href="{% url 'notification-list' %}">Activities</a>
                 <a class="{% if request.resolver_match.url_name == 'analytics' %}active{% endif %}" href="{% url 'analytics' %}">AI Insights</a>
-                <a class="{% if request.resolver_match.url_name == 'notification-list' %}active{% endif %}" href="{% url 'notification-list' %}">Notifications</a>
             </nav>
             <div class="sidebar-footer">
                 {% if user.is_authenticated %}

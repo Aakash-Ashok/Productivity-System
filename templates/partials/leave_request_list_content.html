@@ -1,0 +1,310 @@
+<style>
+.leave-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:25px;
+    flex-wrap:wrap;
+    gap:15px;
+}
+
+.leave-title h1{
+    font-size:32px;
+    color:#0f172a;
+    margin-bottom:6px;
+}
+
+.leave-title p{
+    color:#64748b;
+}
+
+.create-request-btn{
+    background:linear-gradient(135deg,#4f46e5,#7c3aed);
+    color:white;
+    text-decoration:none;
+    padding:12px 18px;
+    border-radius:12px;
+    font-weight:600;
+    transition:.25s;
+}
+
+.create-request-btn:hover{
+    transform:translateY(-2px);
+}
+
+.leave-card{
+    background:#fff;
+    border-radius:24px;
+    padding:24px;
+    box-shadow:0 10px 30px rgba(0,0,0,.05);
+    overflow:hidden;
+}
+
+.leave-table{
+    width:100%;
+    border-collapse:collapse;
+}
+
+.leave-table thead{
+    background:#f8fafc;
+}
+
+.leave-table th{
+    padding:16px;
+    text-align:left;
+    color:#475569;
+    font-size:14px;
+    font-weight:600;
+}
+
+.leave-table td{
+    padding:18px 16px;
+    border-top:1px solid #e5e7eb;
+}
+
+.leave-table tbody tr{
+    transition:.25s;
+}
+
+.leave-table tbody tr:hover{
+    background:#f8fafc;
+}
+
+.employee-cell{
+    display:flex;
+    align-items:center;
+    gap:12px;
+}
+
+.avatar{
+    width:42px;
+    height:42px;
+    border-radius:50%;
+    background:linear-gradient(135deg,#4f46e5,#8b5cf6);
+    color:white;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-weight:700;
+}
+
+.employee-name{
+    font-weight:600;
+    color:#0f172a;
+}
+
+.leave-dates{
+    color:#334155;
+    font-weight:500;
+}
+
+.status-pill{
+    display:inline-block;
+    padding:6px 12px;
+    border-radius:999px;
+    font-size:13px;
+    font-weight:600;
+}
+
+.status-pending{
+    background:#fef3c7;
+    color:#92400e;
+}
+
+.status-approved{
+    background:#dcfce7;
+    color:#166534;
+}
+
+.status-rejected{
+    background:#fee2e2;
+    color:#b91c1c;
+}
+
+.remarks{
+    color:#64748b;
+    max-width:250px;
+}
+
+.review-btn{
+    display:inline-block;
+    text-decoration:none;
+    background:#eef2ff;
+    color:#4338ca;
+    padding:8px 14px;
+    border-radius:10px;
+    font-weight:600;
+    transition:.25s;
+}
+
+.review-btn:hover{
+    background:#4338ca;
+    color:white;
+}
+
+.empty-state{
+    text-align:center;
+    padding:60px 20px;
+}
+
+.empty-state i{
+    font-size:60px;
+    color:#cbd5e1;
+    margin-bottom:15px;
+}
+
+.empty-state h3{
+    color:#334155;
+    margin-bottom:10px;
+}
+
+.empty-state p{
+    color:#64748b;
+}
+
+@media(max-width:1000px){
+
+    .leave-card{
+        overflow-x:auto;
+    }
+
+    .leave-table{
+        min-width:900px;
+    }
+
+}
+</style>
+
+<!-- Header -->
+<section class="leave-header">
+
+    <div class="leave-title">
+        <h1>Leave Requests</h1>
+        <p>
+            Manage employee leave applications and approval workflow.
+        </p>
+    </div>
+
+    {% if is_employee_role %}
+        <a href="{% url 'leave-request-create' %}"
+           class="create-request-btn">
+            + Create Leave Request
+        </a>
+    {% endif %}
+
+</section>
+
+<!-- Leave Table -->
+<section class="leave-card">
+
+{% if requests %}
+
+<table class="leave-table">
+
+    <thead>
+        <tr>
+            <th>Employee</th>
+            <th>Start Date</th>
+            <th>End Date</th>
+            <th>Status</th>
+            <th>Remarks</th>
+            <th>Action</th>
+        </tr>
+    </thead>
+
+    <tbody>
+
+    {% for item in requests %}
+
+    <tr>
+
+        <td>
+
+            <div class="employee-cell">
+
+                <div class="avatar">
+                    {{ item.employee.name|first|upper }}
+                </div>
+
+                <div class="employee-name">
+                    {{ item.employee.name }}
+                </div>
+
+            </div>
+
+        </td>
+
+        <td class="leave-dates">
+            {{ item.start_date }}
+        </td>
+
+        <td class="leave-dates">
+            {{ item.end_date }}
+        </td>
+
+        <td>
+
+            {% if item.status == 'approved' %}
+                <span class="status-pill status-approved">
+                    Approved
+                </span>
+
+            {% elif item.status == 'rejected' %}
+                <span class="status-pill status-rejected">
+                    Rejected
+                </span>
+
+            {% else %}
+                <span class="status-pill status-pending">
+                    Pending
+                </span>
+            {% endif %}
+
+        </td>
+
+        <td class="remarks">
+            {{ item.remarks|default:"No remarks provided" }}
+        </td>
+
+        <td>
+
+            {% if can_manage_delivery and not is_employee_role %}
+
+                <a href="{% url 'leave-request-review' item.pk %}"
+                   class="review-btn">
+                    Review
+                </a>
+
+            {% else %}
+
+                —
+
+            {% endif %}
+
+        </td>
+
+    </tr>
+
+    {% endfor %}
+
+    </tbody>
+
+</table>
+
+{% else %}
+
+<div class="empty-state">
+
+    <i class="fa-solid fa-calendar-xmark"></i>
+
+    <h3>No Leave Requests Found</h3>
+
+    <p>
+        Leave requests submitted by employees will appear here.
+    </p>
+
+</div>
+
+{% endif %}
+
+</section>

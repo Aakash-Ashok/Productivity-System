@@ -1,0 +1,232 @@
+<style>
+.approval-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:25px;
+    flex-wrap:wrap;
+    gap:15px;
+}
+
+.approval-title h1{
+    font-size:32px;
+    color:#0f172a;
+    margin-bottom:6px;
+}
+
+.approval-title p{
+    color:#64748b;
+}
+
+.approval-badge{
+    background:linear-gradient(135deg,#4f46e5,#7c3aed);
+    color:white;
+    padding:12px 18px;
+    border-radius:999px;
+    font-weight:600;
+}
+
+.approval-card{
+    background:white;
+    border-radius:24px;
+    padding:24px;
+    box-shadow:0 10px 30px rgba(0,0,0,.05);
+    overflow:hidden;
+}
+
+.approval-table{
+    width:100%;
+    border-collapse:collapse;
+}
+
+.approval-table thead{
+    background:#f8fafc;
+}
+
+.approval-table th{
+    text-align:left;
+    padding:16px;
+    font-size:14px;
+    color:#475569;
+    font-weight:600;
+}
+
+.approval-table td{
+    padding:18px 16px;
+    border-top:1px solid #e5e7eb;
+}
+
+.approval-table tbody tr{
+    transition:.25s;
+}
+
+.approval-table tbody tr:hover{
+    background:#f8fafc;
+}
+
+.task-name{
+    font-weight:600;
+    color:#0f172a;
+}
+
+.employee-chip{
+    display:inline-block;
+    background:#eef2ff;
+    color:#4338ca;
+    padding:6px 12px;
+    border-radius:999px;
+    font-size:13px;
+    font-weight:500;
+}
+
+.pending-status{
+    display:inline-block;
+    background:#fef3c7;
+    color:#92400e;
+    padding:6px 12px;
+    border-radius:999px;
+    font-size:12px;
+    font-weight:600;
+}
+
+.review-btn{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    text-decoration:none;
+    background:linear-gradient(135deg,#4f46e5,#7c3aed);
+    color:white;
+    padding:10px 18px;
+    border-radius:12px;
+    font-weight:600;
+    transition:.25s;
+}
+
+.review-btn:hover{
+    transform:translateY(-2px);
+    box-shadow:0 8px 20px rgba(79,70,229,.25);
+}
+
+.empty-state{
+    text-align:center;
+    padding:60px 20px;
+    color:#64748b;
+}
+
+.empty-state i{
+    font-size:48px;
+    margin-bottom:15px;
+    color:#cbd5e1;
+}
+
+@media(max-width:900px){
+
+    .approval-card{
+        overflow-x:auto;
+    }
+
+    .approval-table{
+        min-width:900px;
+    }
+
+}
+</style>
+
+<!-- Header -->
+<section class="approval-header">
+
+    <div class="approval-title">
+        <h1>Approval Queue</h1>
+        <p>
+            Submitted task approvals awaiting review and action.
+        </p>
+    </div>
+
+    <div class="approval-badge">
+        Pending Requests: {{ requests|length }}
+    </div>
+
+</section>
+
+<!-- Approval Table -->
+<section class="approval-card">
+
+    {% if requests %}
+
+    <table class="approval-table">
+
+        <thead>
+            <tr>
+                <th>Task</th>
+                <th>Employee</th>
+                <th>Submitted By</th>
+                <th>Created</th>
+                <th>Status</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+
+        <tbody>
+
+        {% for item in requests %}
+
+            <tr>
+
+                <td>
+                    <div class="task-name">
+                        {{ item.task.title }}
+                    </div>
+                </td>
+
+                <td>
+                    <span class="employee-chip">
+                        {{ item.employee.name }}
+                    </span>
+                </td>
+
+                <td>
+                    {{ item.raised_by.username|default:"-" }}
+                </td>
+
+                <td>
+                    {{ item.created_at }}
+                </td>
+
+                <td>
+                    <span class="pending-status">
+                        Pending Review
+                    </span>
+                </td>
+
+                <td>
+                    <a href="{% url 'task-approve' item.task.pk %}"
+                       class="review-btn">
+                        Review Request
+                    </a>
+                </td>
+
+            </tr>
+
+        {% endfor %}
+
+        </tbody>
+
+    </table>
+
+    {% else %}
+
+    <div class="empty-state">
+
+        <i class="fa-solid fa-circle-check"></i>
+
+        <h3>No Approval Requests</h3>
+
+        <p>
+            There are currently no pending approval requests.
+        </p>
+
+    </div>
+
+    {% endif %}
+
+</section>

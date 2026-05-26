@@ -1,0 +1,311 @@
+<style>
+.review-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:25px;
+    flex-wrap:wrap;
+    gap:15px;
+}
+
+.review-title h1{
+    font-size:32px;
+    color:#0f172a;
+    margin-bottom:6px;
+}
+
+.review-title p{
+    color:#64748b;
+}
+
+.add-review-btn{
+    background:linear-gradient(135deg,#4f46e5,#7c3aed);
+    color:white;
+    text-decoration:none;
+    padding:12px 18px;
+    border-radius:12px;
+    font-weight:600;
+    transition:.25s;
+}
+
+.add-review-btn:hover{
+    transform:translateY(-2px);
+    box-shadow:0 10px 25px rgba(79,70,229,.25);
+}
+
+.review-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(350px,1fr));
+    gap:20px;
+}
+
+.review-card{
+    background:white;
+    border-radius:24px;
+    padding:24px;
+    box-shadow:0 10px 30px rgba(0,0,0,.05);
+    transition:.25s;
+    border:1px solid #eef2ff;
+}
+
+.review-card:hover{
+    transform:translateY(-4px);
+    box-shadow:0 15px 35px rgba(0,0,0,.08);
+}
+
+.review-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    margin-bottom:18px;
+}
+
+.user-info{
+    display:flex;
+    align-items:center;
+    gap:12px;
+}
+
+.avatar{
+    width:48px;
+    height:48px;
+    border-radius:50%;
+    background:linear-gradient(135deg,#4f46e5,#8b5cf6);
+    color:white;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-weight:700;
+    font-size:18px;
+}
+
+.user-name{
+    font-weight:600;
+    color:#0f172a;
+}
+
+.review-date{
+    font-size:13px;
+    color:#94a3b8;
+}
+
+.review-heading{
+    font-size:18px;
+    font-weight:700;
+    color:#0f172a;
+    margin-bottom:12px;
+}
+
+.review-message{
+    color:#475569;
+    line-height:1.7;
+    margin-bottom:18px;
+}
+
+.rating-badge{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    padding:8px 14px;
+    border-radius:999px;
+    background:#fef3c7;
+    color:#92400e;
+    font-weight:600;
+}
+
+.review-footer{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding-top:15px;
+    border-top:1px solid #e5e7eb;
+}
+
+.review-label{
+    color:#94a3b8;
+    font-size:13px;
+}
+
+.empty-state{
+    background:white;
+    border-radius:24px;
+    padding:70px 20px;
+    text-align:center;
+    box-shadow:0 10px 30px rgba(0,0,0,.05);
+}
+
+.empty-state i{
+    font-size:60px;
+    color:#cbd5e1;
+    margin-bottom:15px;
+}
+
+.empty-state h3{
+    color:#334155;
+    margin-bottom:10px;
+}
+
+.empty-state p{
+    color:#64748b;
+}
+
+.stats-banner{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+    gap:15px;
+    margin-bottom:25px;
+}
+
+.stat-card{
+    background:white;
+    border-radius:18px;
+    padding:20px;
+    text-align:center;
+    box-shadow:0 10px 25px rgba(0,0,0,.05);
+}
+
+.stat-value{
+    font-size:28px;
+    font-weight:700;
+    color:#4f46e5;
+}
+
+.stat-label{
+    color:#64748b;
+    font-size:14px;
+    margin-top:5px;
+}
+
+@media(max-width:768px){
+
+    .review-grid{
+        grid-template-columns:1fr;
+    }
+
+}
+</style>
+
+<!-- Header -->
+<section class="review-header">
+
+    <div class="review-title">
+        <h1>Performance Reviews</h1>
+        <p>
+            Employee feedback, ratings and performance evaluations.
+        </p>
+    </div>
+
+    {% if can_manage_delivery %}
+        <a href="{% url 'performance-review-create' %}"
+           class="add-review-btn">
+            + Add Review
+        </a>
+    {% endif %}
+
+</section>
+
+<!-- Stats -->
+<section class="stats-banner">
+
+    <div class="stat-card">
+        <div class="stat-value">
+            {{ reviews|length }}
+        </div>
+        <div class="stat-label">
+            Total Reviews
+        </div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-value">
+            ★
+        </div>
+        <div class="stat-label">
+            Performance Feedback
+        </div>
+    </div>
+
+</section>
+
+<!-- Reviews -->
+{% if reviews %}
+
+<section class="review-grid">
+
+    {% for review in reviews %}
+
+    <article class="review-card">
+
+        <div class="review-top">
+
+            <div class="user-info">
+
+                <div class="avatar">
+                    {{ review.user.username|first|upper|default:"U" }}
+                </div>
+
+                <div>
+
+                    <div class="user-name">
+                        {{ review.user.username|default:"Unknown User" }}
+                    </div>
+
+                    <div class="review-date">
+                        {{ review.created_at }}
+                    </div>
+
+                </div>
+
+            </div>
+
+            {% if review.rating %}
+                <div class="rating-badge">
+                    ★ {{ review.rating }}
+                </div>
+            {% endif %}
+
+        </div>
+
+        <div class="review-heading">
+            {{ review.title|default:"Performance Review" }}
+        </div>
+
+        <div class="review-message">
+            {{ review.message }}
+        </div>
+
+        <div class="review-footer">
+
+            <span class="review-label">
+                Review Record
+            </span>
+
+            {% if review.rating %}
+                <span class="review-label">
+                    Rating: {{ review.rating }}
+                </span>
+            {% endif %}
+
+        </div>
+
+    </article>
+
+    {% endfor %}
+
+</section>
+
+{% else %}
+
+<div class="empty-state">
+
+    <i class="fa-solid fa-star"></i>
+
+    <h3>No Performance Reviews</h3>
+
+    <p>
+        Employee feedback and performance evaluations will appear here.
+    </p>
+
+</div>
+
+{% endif %}

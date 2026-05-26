@@ -1,0 +1,185 @@
+<style>
+.notification-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:25px;
+    flex-wrap:wrap;
+    gap:15px;
+}
+
+.notification-title h1{
+    font-size:32px;
+    color:#0f172a;
+    margin-bottom:6px;
+}
+
+.notification-title p{
+    color:#64748b;
+}
+
+.notification-badge{
+    background:linear-gradient(135deg,#4f46e5,#7c3aed);
+    color:white;
+    padding:12px 18px;
+    border-radius:999px;
+    font-weight:600;
+}
+
+.notification-container{
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+}
+
+.notification-card{
+    background:white;
+    border-radius:20px;
+    padding:20px;
+    box-shadow:0 8px 25px rgba(0,0,0,.05);
+    display:flex;
+    gap:16px;
+    align-items:flex-start;
+    transition:.25s;
+    border-left:4px solid #6366f1;
+}
+
+.notification-card:hover{
+    transform:translateY(-2px);
+    box-shadow:0 12px 30px rgba(0,0,0,.08);
+}
+
+.notification-icon{
+    width:48px;
+    height:48px;
+    min-width:48px;
+    border-radius:50%;
+    background:linear-gradient(135deg,#4f46e5,#8b5cf6);
+    color:white;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:18px;
+}
+
+.notification-content{
+    flex:1;
+}
+
+.notification-heading{
+    font-size:16px;
+    font-weight:600;
+    color:#0f172a;
+    margin-bottom:6px;
+}
+
+.notification-message{
+    color:#475569;
+    line-height:1.6;
+    margin-bottom:10px;
+}
+
+.notification-time{
+    color:#94a3b8;
+    font-size:13px;
+}
+
+.empty-state{
+    text-align:center;
+    background:white;
+    padding:60px 20px;
+    border-radius:24px;
+    box-shadow:0 8px 25px rgba(0,0,0,.05);
+}
+
+.empty-state i{
+    font-size:60px;
+    color:#cbd5e1;
+    margin-bottom:15px;
+}
+
+.empty-state h3{
+    margin-bottom:10px;
+    color:#334155;
+}
+
+.empty-state p{
+    color:#64748b;
+}
+
+@media(max-width:768px){
+
+    .notification-card{
+        flex-direction:column;
+        align-items:flex-start;
+    }
+
+}
+</style>
+
+<!-- Header -->
+<section class="notification-header">
+
+    <div class="notification-title">
+        <h1>Notifications</h1>
+        <p>
+            System alerts, workflow updates and activity notifications.
+        </p>
+    </div>
+
+    <div class="notification-badge">
+        {{ notifications|length }} Notifications
+    </div>
+
+</section>
+
+<!-- Notification List -->
+{% if notifications %}
+
+<section class="notification-container">
+
+    {% for item in notifications %}
+
+    <div class="notification-card">
+
+        <div class="notification-icon">
+            🔔
+        </div>
+
+        <div class="notification-content">
+
+            <div class="notification-heading">
+                {{ item.title|default:"Notification" }}
+            </div>
+
+            <div class="notification-message">
+                {{ item.message }}
+            </div>
+
+            <div class="notification-time">
+                {{ item.created_at }}
+            </div>
+
+        </div>
+
+    </div>
+
+    {% endfor %}
+
+</section>
+
+{% else %}
+
+<div class="empty-state">
+
+    <i class="fa-solid fa-bell-slash"></i>
+
+    <h3>No Notifications</h3>
+
+    <p>
+        New alerts and workflow updates will appear here.
+    </p>
+
+</div>
+
+{% endif %}

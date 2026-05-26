@@ -1,0 +1,442 @@
+<style>
+.analytics-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:30px;
+    flex-wrap:wrap;
+    gap:20px;
+}
+
+.analytics-title h1{
+    font-size:32px;
+    color:#0f172a;
+    margin-bottom:6px;
+}
+
+.analytics-title p{
+    color:#64748b;
+}
+
+.analytics-badge{
+    background:linear-gradient(135deg,#4f46e5,#7c3aed);
+    color:white;
+    padding:12px 20px;
+    border-radius:50px;
+    font-weight:600;
+}
+
+.analytics-stats{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+    gap:20px;
+    margin-bottom:30px;
+}
+
+.metric-card{
+    background:white;
+    padding:24px;
+    border-radius:20px;
+    box-shadow:0 10px 25px rgba(0,0,0,.05);
+    transition:.3s;
+}
+
+.metric-card:hover{
+    transform:translateY(-4px);
+}
+
+.metric-card .label{
+    color:#64748b;
+    font-size:14px;
+}
+
+.metric-card .value{
+    font-size:36px;
+    font-weight:700;
+    color:#111827;
+    margin-top:10px;
+}
+
+.analytics-grid{
+    display:grid;
+    grid-template-columns:2fr 1fr;
+    gap:20px;
+    margin-bottom:20px;
+}
+
+.analytics-card{
+    background:white;
+    border-radius:20px;
+    padding:24px;
+    box-shadow:0 10px 25px rgba(0,0,0,.05);
+}
+
+.analytics-card h3{
+    margin-bottom:20px;
+    color:#0f172a;
+}
+
+.analytics-table{
+    width:100%;
+    border-collapse:collapse;
+}
+
+.analytics-table th{
+    background:#f8fafc;
+    padding:14px;
+    text-align:left;
+    color:#475569;
+}
+
+.analytics-table td{
+    padding:14px;
+    border-top:1px solid #e5e7eb;
+}
+
+.health-pill{
+    display:inline-block;
+    background:#ecfdf5;
+    color:#059669;
+    padding:4px 10px;
+    border-radius:999px;
+    font-size:12px;
+    font-weight:600;
+}
+
+.risk-pill{
+    display:inline-block;
+    background:#fef2f2;
+    color:#dc2626;
+    padding:4px 10px;
+    border-radius:999px;
+    font-size:12px;
+    font-weight:600;
+}
+
+.ai-item{
+    padding:14px 0;
+    border-bottom:1px solid #f1f5f9;
+}
+
+.ai-item:last-child{
+    border-bottom:none;
+}
+
+.progress{
+    width:100%;
+    height:8px;
+    background:#e5e7eb;
+    border-radius:10px;
+    overflow:hidden;
+    margin-top:8px;
+}
+
+.progress-fill{
+    height:100%;
+    background:linear-gradient(90deg,#4f46e5,#8b5cf6);
+}
+
+@media(max-width:992px){
+    .analytics-grid{
+        grid-template-columns:1fr;
+    }
+}
+</style>
+
+<!-- Header -->
+<section class="analytics-header">
+
+    <div class="analytics-title">
+        <h1>AI Analytics Dashboard</h1>
+        <p>Performance metrics, predictive insights and workforce intelligence.</p>
+    </div>
+
+    <div class="analytics-badge">
+        AI Powered Analytics
+    </div>
+
+</section>
+
+<!-- KPI Cards -->
+<section class="analytics-stats">
+
+    <div class="metric-card">
+        <div class="label">Total Tasks</div>
+        <div class="value">{{ task_count }}</div>
+    </div>
+
+    <div class="metric-card">
+        <div class="label">Completed Tasks</div>
+        <div class="value">{{ completed_count }}</div>
+    </div>
+
+    <div class="metric-card">
+        <div class="label">Delayed Tasks</div>
+        <div class="value">{{ delayed_count }}</div>
+    </div>
+
+    <div class="metric-card">
+        <div class="label">AI Predictions</div>
+        <div class="value">{{ ai_results|length }}</div>
+    </div>
+
+</section>
+
+<!-- Performance + AI Results -->
+<section class="analytics-grid">
+
+    <div class="analytics-card">
+
+        <h3>Employee Performance</h3>
+
+        <table class="analytics-table">
+
+            <thead>
+                <tr>
+                    <th>Employee</th>
+                    <th>Completed</th>
+                    <th>Avg Time</th>
+                    <th>Delayed</th>
+                    <th>Burnout Risk</th>
+                </tr>
+            </thead>
+
+            <tbody>
+
+            {% for employee, metric in employee_metrics %}
+                <tr>
+                    <td>{{ employee.name }}</td>
+                    <td>{{ metric.tasks_completed }}</td>
+                    <td>{{ metric.avg_completion_time }}</td>
+                    <td>{{ metric.delayed_tasks }}</td>
+                    <td>
+                        <span class="risk-pill">
+                            {{ metric.burnout_risk }}
+                        </span>
+                    </td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="5">
+                        No performance rows available.
+                    </td>
+                </tr>
+            {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+    <div class="analytics-card">
+
+        <h3>Task AI Results</h3>
+
+        {% for result in ai_results %}
+            <div class="ai-item">
+
+                <strong>
+                    {{ result.task.title }}
+                </strong>
+
+                <br>
+
+                Predicted:
+                {{ result.predicted_time }}h
+
+                <br>
+
+                Delay Risk:
+                {{ result.delay_risk }}%
+
+                <div class="progress">
+                    <div class="progress-fill"
+                         style="width:{{ result.delay_risk }}%">
+                    </div>
+                </div>
+
+            </div>
+
+        {% empty %}
+            <p>No AI results generated yet.</p>
+        {% endfor %}
+
+    </div>
+
+</section>
+
+<!-- Employee AI Profiles -->
+<section class="analytics-card" style="margin-bottom:20px;">
+
+    <h3>Employee AI Profiles</h3>
+
+    <table class="analytics-table">
+
+        <thead>
+            <tr>
+                <th>Employee</th>
+                <th>Productivity</th>
+                <th>Burnout</th>
+                <th>Focus Area</th>
+                <th>Learning Priority</th>
+            </tr>
+        </thead>
+
+        <tbody>
+
+        {% for employee, profile in employee_ai_profiles %}
+            <tr>
+                <td>{{ employee.name }}</td>
+
+                <td>
+                    <span class="health-pill">
+                        {{ profile.productivity_score }}
+                    </span>
+                </td>
+
+                <td>{{ profile.burnout_risk }}</td>
+
+                <td>{{ profile.focus_area }}</td>
+
+                <td>
+                    {{ profile.learning_priority|join:", "|default:"-"}}
+                </td>
+            </tr>
+        {% empty %}
+            <tr>
+                <td colspan="5">
+                    No employee AI profiles available.
+                </td>
+            </tr>
+        {% endfor %}
+
+        </tbody>
+
+    </table>
+
+</section>
+
+<!-- Project Forecast -->
+<section class="analytics-card" style="margin-bottom:20px;">
+
+    <h3>Project AI Forecast</h3>
+
+    <table class="analytics-table">
+
+        <thead>
+            <tr>
+                <th>Project</th>
+                <th>Health</th>
+                <th>Delay Risk</th>
+                <th>Confidence</th>
+                <th>Recommendation</th>
+            </tr>
+        </thead>
+
+        <tbody>
+
+        {% for row in project_ai_rows %}
+            <tr>
+                <td>{{ row.project.name }}</td>
+
+                <td>
+                    <span class="health-pill">
+                        {{ row.health_score }}
+                    </span>
+                </td>
+
+                <td>
+                    <span class="risk-pill">
+                        {{ row.delay_risk }}%
+                    </span>
+                </td>
+
+                <td>{{ row.completion_confidence }}%</td>
+
+                <td>{{ row.recommended_action }}</td>
+            </tr>
+        {% empty %}
+            <tr>
+                <td colspan="5">
+                    No project AI forecast available.
+                </td>
+            </tr>
+        {% endfor %}
+
+        </tbody>
+
+    </table>
+
+</section>
+
+<!-- Team Health + Anomaly Detection -->
+<section class="analytics-grid">
+
+    <div class="analytics-card">
+
+        <h3>Team Health Intelligence</h3>
+
+        {% for row in team_health_rows %}
+
+            <div class="ai-item">
+
+                <strong>
+                    {{ row.team.name }}
+                </strong>
+
+                <br>
+
+                Health Score:
+                {{ row.health_score }}
+
+                |
+
+                Burnout Alerts:
+                {{ row.burnout_count }}
+
+                <p style="margin-top:8px;">
+                    {{ row.recommended_action }}
+                </p>
+
+            </div>
+
+        {% empty %}
+            <p>No team health summary available.</p>
+        {% endfor %}
+
+    </div>
+
+    <div class="analytics-card">
+
+        <h3>Task Anomaly Detection</h3>
+
+        {% for task, anomaly in task_anomalies %}
+
+            <div class="ai-item">
+
+                <strong>
+                    {{ task.title }}
+                </strong>
+
+                <br>
+
+                <span class="risk-pill">
+                    {{ anomaly.label }}
+                </span>
+
+                {{ anomaly.score }}%
+
+                <p style="margin-top:8px;">
+                    {{ anomaly.signals|first }}
+                </p>
+
+            </div>
+
+        {% empty %}
+            <p>No anomaly signals detected.</p>
+        {% endfor %}
+
+    </div>
+
+</section>
