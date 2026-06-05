@@ -57,3 +57,5 @@ class ActivityAdmin(admin.ModelAdmin):
 @admin.register(Attachment)
 class AttachmentAdmin(admin.ModelAdmin):
     list_display = ('task', 'label', 'uploaded_by', 'created_at')
+
+

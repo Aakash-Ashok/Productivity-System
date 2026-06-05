@@ -3,7 +3,7 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 from django.utils.crypto import get_random_string
 
-from .models import Activity, AppRole, Attachment, Employee, Project, Request, Task, TaskLog, Team, assign_user_role
+from .models import Activity, AppRole, Attachment, Employee, Project, Request, Task, TaskLog, Team, assign_user_role 
 
 
 class DateInput(forms.DateInput):
@@ -11,7 +11,12 @@ class DateInput(forms.DateInput):
 
 
 class UserAccountForm(forms.ModelForm):
-    role = forms.ChoiceField(choices=AppRole.choices)
+    role = forms.ChoiceField(
+    choices=[
+        (AppRole.ADMIN, "Admin"),
+        (AppRole.MANAGER, "Manager"),
+    ]
+)
     password = forms.CharField(widget=forms.PasswordInput(), required=False, help_text='Leave blank to auto-generate.')
 
     class Meta:
@@ -91,71 +96,133 @@ class TeamForm(forms.ModelForm):
 
 
 class EmployeeForm(forms.ModelForm):
-    username = forms.CharField(required=False, help_text='Required only when creating a new employee login.')
+    username = forms.CharField(
+        required=True,
+        help_text="Login username"
+    )
+
     password = forms.CharField(
         required=False,
         widget=forms.PasswordInput(),
-        help_text='Leave blank to auto-generate for a new employee login.',
+        help_text="Leave blank to auto-generate password."
     )
 
     class Meta:
         model = Employee
         fields = [
-            'user',
-            'team',
-            'name',
-            'email',
-            'job_title',
-            'skills',
-            'experience',
-            'weekly_capacity_hours',
-            'availability',
+            "team",
+            "name",
+            "email",
+            "job_title",
+            "skills",
+            "experience",
+            "weekly_capacity_hours",
+            "availability",
         ]
+
         widgets = {
-            'skills': forms.Textarea(attrs={'rows': 3}),
+            "skills": forms.Textarea(attrs={"rows": 3}),
         }
 
-    def clean(self):
-        cleaned_data = super().clean()
-        user = cleaned_data.get('user')
-        username = cleaned_data.get('username')
+    def clean_username(self):
 
-        if not user and not username:
-            raise forms.ValidationError('Select an existing user or provide a username to create a new employee login.')
-        if username and User.objects.filter(username=username).exists():
-            self.add_error('username', 'This username is already taken.')
-        return cleaned_data
+        username = self.cleaned_data["username"]
+
+        queryset = User.objects.filter(
+            username=username
+        )
+
+        if self.instance.pk and self.instance.user:
+            queryset = queryset.exclude(
+                pk=self.instance.user.pk
+            )
+
+        if queryset.exists():
+            raise forms.ValidationError(
+                "Username already exists."
+            )
+
+        return username
 
     def save(self, commit=True):
+
         employee = super().save(commit=False)
-        created_user = None
-        created_password = None
+
+        username = self.cleaned_data["username"]
+
+        password = (
+            self.cleaned_data["password"]
+            or get_random_string(10)
+        )
 
         if employee.user is None:
-            username = self.cleaned_data['username']
-            created_password = self.cleaned_data['password'] or get_random_string(10)
-            created_user = User.objects.create_user(
+
+            user = User.objects.create_user(
                 username=username,
-                email=self.cleaned_data['email'],
-                password=created_password,
+                email=employee.email,
+                password=password
             )
-            assign_user_role(created_user, AppRole.EMPLOYEE)
-            employee.user = created_user
+
+            assign_user_role(
+                user,
+                AppRole.EMPLOYEE
+            )
+
+            employee.user = user
+
+            employee.created_user = user
+            employee.created_password = password
 
         if commit:
             employee.save()
 
-        employee.created_user = created_user
-        employee.created_password = created_password
         return employee
 
 
+class EmployeeUpdateForm(forms.ModelForm):
+    class Meta:
+
+        model = Employee
+
+        fields = [
+            "team",
+            "name",
+            "email",
+            "job_title",
+            "skills",
+            "experience",
+            "weekly_capacity_hours",
+            "availability",
+        ]
+
+
+
 class ProjectForm(forms.ModelForm):
+
+    required_skills = forms.CharField(
+        required=False,
+        widget=forms.Textarea(
+            attrs={"rows": 3}
+        ),
+        help_text="Example: Python, Django, SQL"
+    )
+
     class Meta:
         model = Project
-        fields = ['name', 'team', 'description', 'deadline', 'status']
+
+        fields = [
+            'name',
+            'team',
+            'description',
+            'deadline',
+            'status',
+            'required_skills'
+        ]
+
         widgets = {
-            'description': forms.Textarea(attrs={'rows': 4}),
+            'description': forms.Textarea(
+                attrs={'rows': 4}
+            ),
             'deadline': DateInput(),
         }
 
@@ -261,14 +328,30 @@ class TaskAttachmentForm(forms.ModelForm):
 
 
 class LeaveRequestForm(forms.ModelForm):
+
     class Meta:
         model = Request
         fields = ['start_date', 'end_date', 'remarks']
-        widgets = {
-            'start_date': DateInput(),
-            'end_date': DateInput(),
-            'remarks': forms.Textarea(attrs={'rows': 3}),
-        }
+
+    def clean(self):
+        cleaned_data = super().clean()
+
+        start_date = cleaned_data.get("start_date")
+        end_date = cleaned_data.get("end_date")
+
+        if start_date and end_date:
+
+            if end_date < start_date:
+                raise forms.ValidationError(
+                    "End date cannot be before start date."
+                )
+
+            if start_date < timezone.localdate():
+                raise forms.ValidationError(
+                    "Leave cannot start in the past."
+                )
+
+        return cleaned_data
 
 
 class LeaveApprovalForm(forms.ModelForm):
@@ -278,3 +361,26 @@ class LeaveApprovalForm(forms.ModelForm):
         widgets = {
             'remarks': forms.Textarea(attrs={'rows': 3}),
         }
+
+
+
+class TaskAttachmentForm(forms.ModelForm):
+
+    class Meta:
+        model = Attachment
+        fields = ["label", "file"]
+
+    def clean_file(self):
+        file = self.cleaned_data["file"]
+
+        max_size = 10 * 1024 * 1024
+
+        if file.size > max_size:
+            raise forms.ValidationError(
+                "File size must be below 10 MB."
+            )
+
+        return file
+    
+
+

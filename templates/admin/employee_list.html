@@ -1,2 +1,371 @@
 {% extends 'admin/adminbase.html' %}
-{% block content %}{% include 'partials/employee_list_content.html' %}{% endblock %}
+
+{% block content %}
+
+<style>
+
+.page-wrapper{
+    display:flex;
+    flex-direction:column;
+    gap:24px;
+}
+
+.page-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:20px;
+}
+
+.page-head h2{
+    font-size:30px;
+    color:#111827;
+    margin-bottom:8px;
+}
+
+.page-head p{
+    color:#6b7280;
+}
+
+.create-btn{
+    background:#111827;
+    color:white;
+    text-decoration:none;
+    padding:11px 18px;
+    border-radius:10px;
+    font-size:14px;
+    font-weight:500;
+}
+
+.stats-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+    gap:18px;
+}
+
+.stat-card{
+    background:white;
+    border:1px solid #e5e7eb;
+    border-radius:18px;
+    padding:22px;
+}
+
+.stat-card span{
+    display:block;
+    color:#6b7280;
+    margin-bottom:10px;
+    font-size:13px;
+}
+
+.stat-card h3{
+    font-size:30px;
+    color:#111827;
+    margin:0;
+}
+
+.employee-panel{
+    background:white;
+    border:1px solid #e5e7eb;
+    border-radius:22px;
+    overflow:hidden;
+}
+
+.table-wrapper{
+    overflow-x:auto;
+}
+
+.employee-table{
+    width:100%;
+    border-collapse:collapse;
+}
+
+.employee-table thead{
+    background:#f9fafb;
+}
+
+.employee-table th{
+    padding:18px;
+    text-align:left;
+    color:#6b7280;
+    font-size:13px;
+    font-weight:600;
+}
+
+.employee-table td{
+    padding:18px;
+    border-top:1px solid #f3f4f6;
+}
+
+.employee-info{
+    display:flex;
+    align-items:center;
+    gap:12px;
+}
+
+.avatar{
+    width:44px;
+    height:44px;
+    border-radius:14px;
+    background:#111827;
+    color:white;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-weight:600;
+}
+
+.employee-name{
+    font-weight:600;
+    color:#111827;
+    margin-bottom:4px;
+}
+
+.employee-email{
+    color:#6b7280;
+    font-size:13px;
+}
+
+.badge{
+    display:inline-flex;
+    align-items:center;
+    padding:6px 12px;
+    border-radius:999px;
+    background:#f3f4f6;
+    color:#374151;
+    font-size:12px;
+    font-weight:500;
+}
+
+.actions{
+    display:flex;
+    gap:10px;
+}
+
+.edit-btn{
+    background:#111827;
+    color:white;
+    text-decoration:none;
+    padding:8px 14px;
+    border-radius:10px;
+    font-size:13px;
+    font-weight:500;
+}
+
+.empty-state{
+    text-align:center;
+    padding:60px 20px;
+}
+
+.empty-state h3{
+    color:#111827;
+    margin-bottom:10px;
+}
+
+.empty-state p{
+    color:#6b7280;
+}
+
+</style>
+
+
+<div class="page-wrapper">
+
+<section class="page-head">
+
+    <div>
+
+        <h2>Employees</h2>
+
+        <p>
+            Manage employee records, teams and availability.
+        </p>
+
+    </div>
+
+    <a href="{% url 'employee-create' %}"
+       class="create-btn">
+
+        + Create Employee
+
+    </a>
+
+</section>
+
+
+
+<section class="stats-grid">
+
+    <article class="stat-card">
+
+        <span>Total Employees</span>
+
+        <h3>{{ employee_count }}</h3>
+
+    </article>
+
+
+    <article class="stat-card">
+
+        <span>Available</span>
+
+        <h3>{{ available_count }}</h3>
+
+    </article>
+
+
+    <article class="stat-card">
+
+        <span>Busy</span>
+
+        <h3>{{ busy_count }}</h3>
+
+    </article>
+
+
+    <article class="stat-card">
+
+        <span>On Leave</span>
+
+        <h3>{{ leave_count }}</h3>
+
+    </article>
+
+</section>
+
+
+
+<section class="employee-panel">
+
+<div class="table-wrapper">
+
+<table class="employee-table">
+
+<thead>
+
+<tr>
+    <th>Employee</th>
+    <th>Team</th>
+    <th>Experience</th>
+    <th>Availability</th>
+    <th>Actions</th>
+</tr>
+
+</thead>
+
+<tbody>
+
+{% for employee in employees %}
+
+<tr>
+
+    <td>
+
+        <div class="employee-info">
+
+            <div class="avatar">
+                {{ employee.name|first|upper }}
+            </div>
+
+            <div>
+
+                <div class="employee-name">
+                    {{ employee.name }}
+                </div>
+
+                <div class="employee-email">
+                    {{ employee.email }}
+                </div>
+
+            </div>
+
+        </div>
+
+    </td>
+
+
+    <td>
+
+        <span class="badge">
+
+            {{ employee.team.name|default:"No Team" }}
+
+        </span>
+
+    </td>
+
+
+    <td>
+
+        {{ employee.experience }} Years
+
+    </td>
+
+
+    <td>
+
+        <span class="badge">
+
+            {{ employee.get_availability_display }}
+
+        </span>
+
+    </td>
+
+
+    <td>
+
+        <div class="actions">
+
+        <a href="{% url 'employee-detail' employee.pk %}"
+        class="edit-btn">
+
+            View
+
+        </a>
+
+        <a href="{% url 'employee-update' employee.pk %}"
+        class="edit-btn">
+
+            Edit
+
+        </a>
+
+</div>
+
+    </td>
+
+</tr>
+
+{% empty %}
+
+<tr>
+
+<td colspan="5">
+
+    <div class="empty-state">
+
+        <h3>No Employees Found</h3>
+
+        <p>
+            Employee records will appear here once added.
+        </p>
+
+    </div>
+
+</td>
+
+</tr>
+
+{% endfor %}
+
+</tbody>
+
+</table>
+
+</div>
+
+</section>
+
+</div>
+
+{% endblock %}

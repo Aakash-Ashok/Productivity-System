@@ -1,2 +1,142 @@
-{% extends 'manager/managebase.html' %}
-{% block content %}{% include 'partials/team_list_content.html' %}{% endblock %}
+{% extends 'manager/managerbase.html' %}
+
+{% block content %}
+
+<style>
+
+.team-page{
+    display:flex;
+    flex-direction:column;
+    gap:24px;
+}
+
+.team-header h2{
+    font-size:28px;
+    color:#111827;
+    margin-bottom:8px;
+}
+
+.team-header p{
+    color:#6b7280;
+}
+
+.team-panel{
+    background:white;
+    border:1px solid #e5e7eb;
+    border-radius:20px;
+    padding:24px;
+}
+
+.member-list{
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+}
+
+.member-item{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:16px;
+    border:1px solid #f3f4f6;
+    border-radius:14px;
+}
+
+.member-info{
+    display:flex;
+    align-items:center;
+    gap:14px;
+}
+
+.avatar{
+    width:46px;
+    height:46px;
+    border-radius:14px;
+    background:#111827;
+    color:white;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-weight:600;
+}
+
+.member-name{
+    font-weight:600;
+    color:#111827;
+}
+
+.member-role{
+    color:#6b7280;
+    font-size:13px;
+}
+
+.assign-btn{
+    padding:9px 14px;
+    border-radius:10px;
+    background:#111827;
+    color:white;
+    text-decoration:none;
+    font-size:13px;
+}
+
+</style>
+
+<div class="team-page">
+
+<section class="team-header">
+
+    <h2>My Team</h2>
+
+    <p>
+        Monitor employee workload and manage assignments.
+    </p>
+
+</section>
+
+
+<section class="team-panel">
+
+    <div class="member-list">
+
+        {% for member in members %}
+
+        <div class="member-item">
+
+            <div class="member-info">
+
+                <div class="avatar">
+                    {{ member.first_name|first }}
+                </div>
+
+                <div>
+
+                    <div class="member-name">
+                        {{ member.get_full_name }}
+                    </div>
+
+                    <div class="member-role">
+                        Employee
+                    </div>
+
+                </div>
+
+            </div>
+
+            <a href="#"
+               class="assign-btn">
+
+                Assign Task
+
+            </a>
+
+        </div>
+
+        {% endfor %}
+
+    </div>
+
+</section>
+
+</div>
+
+{% endblock %}

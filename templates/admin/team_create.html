@@ -1,0 +1,268 @@
+{% extends 'admin/adminbase.html' %}
+
+{% block title %}
+Create Team
+{% endblock %}
+
+{% block content %}
+
+<style>
+
+.page-wrapper{
+    max-width:1000px;
+    margin:auto;
+}
+
+.hero{
+    background:white;
+    border:1px solid #e5e7eb;
+    border-radius:22px;
+    padding:28px;
+    margin-bottom:24px;
+}
+
+.hero h2{
+    margin:0;
+    color:#111827;
+    font-size:30px;
+    font-weight:700;
+}
+
+.hero p{
+    margin-top:8px;
+    color:#6b7280;
+}
+
+.form-card{
+    background:white;
+    border:1px solid #e5e7eb;
+    border-radius:22px;
+    padding:30px;
+}
+
+.form-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:20px;
+}
+
+.form-group{
+    display:flex;
+    flex-direction:column;
+}
+
+.form-group.full{
+    grid-column:1 / -1;
+}
+
+.form-group label{
+    font-size:14px;
+    font-weight:600;
+    color:#374151;
+    margin-bottom:8px;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea{
+    width:100%;
+    padding:12px 14px;
+    border:1px solid #d1d5db;
+    border-radius:10px;
+    font-size:14px;
+    box-sizing:border-box;
+}
+
+.form-group textarea{
+    resize:vertical;
+    min-height:120px;
+}
+
+.help-text{
+    margin-top:6px;
+    color:#6b7280;
+    font-size:12px;
+}
+
+.errorlist{
+    margin-top:8px;
+    color:#dc2626;
+    list-style:none;
+    padding:0;
+    font-size:13px;
+}
+
+.action-bar{
+    display:flex;
+    justify-content:flex-end;
+    gap:12px;
+    margin-top:30px;
+}
+
+.btn{
+    text-decoration:none;
+    padding:12px 18px;
+    border-radius:10px;
+    font-weight:600;
+    cursor:pointer;
+    border:none;
+}
+
+.btn-secondary{
+    background:#f3f4f6;
+    color:#374151;
+}
+
+.btn-primary{
+    background:#111827;
+    color:white;
+}
+
+.info-card{
+    margin-top:24px;
+    background:#f9fafb;
+    border:1px solid #e5e7eb;
+    border-radius:18px;
+    padding:20px;
+}
+
+.info-card h4{
+    margin-top:0;
+    color:#111827;
+}
+
+.info-card ul{
+    margin:0;
+    padding-left:18px;
+    color:#6b7280;
+}
+
+@media(max-width:768px){
+
+    .form-grid{
+        grid-template-columns:1fr;
+    }
+
+}
+
+</style>
+
+<div class="page-wrapper">
+
+```
+<section class="hero">
+
+    <h2>Create Team</h2>
+
+    <p>
+        Create a new team and assign a manager.
+        Employees and projects can be assigned later.
+    </p>
+
+</section>
+
+<section class="form-card">
+
+    <form method="post">
+
+        {% csrf_token %}
+
+        <div class="form-grid">
+
+            <div class="form-group">
+
+                <label>
+                    Team Name
+                </label>
+
+                {{ form.name }}
+
+                {{ form.name.errors }}
+
+            </div>
+
+            <div class="form-group">
+
+                <label>
+                    Team Manager
+                </label>
+
+                {{ form.manager }}
+
+                {{ form.manager.errors }}
+
+            </div>
+
+            <div class="form-group full">
+
+                <label>
+                    Team Description
+                </label>
+
+                {{ form.description }}
+
+                {{ form.description.errors }}
+
+                <div class="help-text">
+                    Describe the team's responsibilities,
+                    objectives and specialization.
+                </div>
+
+            </div>
+
+        </div>
+
+        <div class="action-bar">
+
+            <a href="{% url 'team-list' %}"
+               class="btn btn-secondary">
+
+                Cancel
+
+            </a>
+
+            <button type="submit"
+                    class="btn btn-primary">
+
+                Create Team
+
+            </button>
+
+        </div>
+
+    </form>
+
+</section>
+
+<section class="info-card">
+
+    <h4>
+        Team Creation Guidelines
+    </h4>
+
+    <ul>
+
+        <li>
+            Assign a manager responsible for team coordination.
+        </li>
+
+        <li>
+            Employees can be added after the team is created.
+        </li>
+
+        <li>
+            Projects will use team information for AI recommendations.
+        </li>
+
+        <li>
+            Team health and productivity analytics will be generated automatically.
+        </li>
+
+    </ul>
+
+</section>
+```
+
+</div>
+
+{% endblock %}

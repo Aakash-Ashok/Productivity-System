@@ -1,2 +1,402 @@
 {% extends 'admin/adminbase.html' %}
-{% block content %}{% include 'partials/user_list_content.html' %}{% endblock %}
+
+{% block title %}
+Users & Roles | Productivity System
+{% endblock %}
+
+{% block content %}
+
+<style>
+
+.page-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:20px;
+    margin-bottom:28px;
+}
+
+.eyebrow{
+    font-size:12px;
+    text-transform:uppercase;
+    letter-spacing:1px;
+    color:#9ca3af;
+    margin-bottom:10px;
+}
+
+.page-head h2{
+    font-size:30px;
+    font-weight:600;
+    color:#111827;
+    margin-bottom:8px;
+}
+
+.muted{
+    color:#6b7280;
+    font-size:14px;
+    line-height:1.6;
+}
+
+.button{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    padding:11px 18px;
+    border-radius:10px;
+    background:#111827;
+    color:white;
+    text-decoration:none;
+    font-size:14px;
+    font-weight:500;
+    border:none;
+    cursor:pointer;
+    transition:.2s;
+}
+
+.button:hover{
+    opacity:.92;
+}
+
+.button.ghost{
+    background:#f3f4f6;
+    color:#374151;
+}
+
+.stats-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+    gap:18px;
+    margin-bottom:26px;
+}
+
+.stat-card{
+    background:white;
+    border:1px solid #e5e7eb;
+    border-radius:18px;
+    padding:22px;
+}
+
+.stat-card span{
+    display:block;
+    color:#6b7280;
+    font-size:13px;
+    margin-bottom:10px;
+}
+
+.stat-card strong{
+    display:block;
+    font-size:30px;
+    color:#111827;
+    margin-bottom:8px;
+}
+
+.stat-card small{
+    color:#6b7280;
+    line-height:1.5;
+}
+
+.panel{
+    background:white;
+    border:1px solid #e5e7eb;
+    border-radius:22px;
+    overflow:hidden;
+}
+
+.panel-header{
+    padding:24px;
+    border-bottom:1px solid #f3f4f6;
+}
+
+.panel h3{
+    font-size:20px;
+    color:#111827;
+    margin-bottom:8px;
+}
+
+.table-wrapper{
+    overflow-x:auto;
+}
+
+.table{
+    width:100%;
+    border-collapse:collapse;
+}
+
+.table thead{
+    background:#f9fafb;
+}
+
+.table th{
+    text-align:left;
+    padding:18px 22px;
+    font-size:13px;
+    color:#6b7280;
+    font-weight:600;
+}
+
+.table td{
+    padding:20px 22px;
+    border-top:1px solid #f3f4f6;
+    color:#111827;
+    font-size:14px;
+    vertical-align:middle;
+}
+
+.table tbody tr:hover{
+    background:#fafafa;
+}
+
+.role-badge,
+.status-badge{
+    display:inline-flex;
+    align-items:center;
+    padding:6px 12px;
+    border-radius:999px;
+    font-size:12px;
+    font-weight:500;
+}
+
+.role-badge{
+    background:#f3f4f6;
+    color:#374151;
+}
+
+.status-active{
+    background:#ecfdf5;
+    color:#065f46;
+}
+
+.status-inactive{
+    background:#f9fafb;
+    color:#6b7280;
+}
+
+.admin-actions{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+}
+
+.empty-row{
+    text-align:center;
+    padding:50px 20px !important;
+    color:#6b7280 !important;
+}
+
+@media(max-width:768px){
+
+    .page-head{
+        flex-direction:column;
+    }
+
+}
+
+</style>
+
+
+<section class="page-head">
+
+    <div>
+
+        <p class="eyebrow">
+            Access Control
+        </p>
+
+        <h2>
+            Users & Roles
+        </h2>
+
+        <p class="muted">
+            Manage access, monitor activation status,
+            and keep admin, manager, and employee accounts organized.
+        </p>
+
+    </div>
+
+    <a class="button"
+       href="{% url 'user-create' %}">
+
+        Create User
+
+    </a>
+
+</section>
+
+
+
+<section class="stats-grid">
+
+    <article class="stat-card">
+
+        <span>Total Accounts</span>
+
+        <strong>
+            {{ user_rows|length }}
+        </strong>
+
+        <small>
+            All workspace users with role-based access.
+        </small>
+
+    </article>
+
+
+    <article class="stat-card">
+
+        <span>Admin Controls</span>
+
+        <strong>
+            Enabled
+        </strong>
+
+        <small>
+            Create, edit, activate, and deactivate accounts.
+        </small>
+
+    </article>
+
+</section>
+
+
+
+<section class="panel">
+
+    <div class="panel-header">
+
+        <h3>User Directory</h3>
+
+        <p class="muted">
+            Review account status and manage role access.
+        </p>
+
+    </div>
+
+
+    <div class="table-wrapper">
+
+        <table class="table">
+
+            <thead>
+
+                <tr>
+                    <th>Username</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Staff Access</th>
+                    <th>Status</th>
+                    <th>Admin Actions</th>
+                </tr>
+
+            </thead>
+
+
+            <tbody>
+
+            {% for account in user_rows %}
+
+                <tr>
+
+                    <td>
+                        {{ account.username }}
+                    </td>
+
+                    <td>
+                        {{ account.email }}
+                    </td>
+
+                    <td>
+
+                        <span class="role-badge">
+                            {{ account.role }}
+                        </span>
+
+                    </td>
+
+                    <td>
+
+                        {% if account.is_staff %}
+                            Yes
+                        {% else %}
+                            No
+                        {% endif %}
+
+                    </td>
+
+                    <td>
+
+                        {% if account.is_active %}
+
+                            <span class="status-badge status-active">
+                                Active
+                            </span>
+
+                        {% else %}
+
+                            <span class="status-badge status-inactive">
+                                Inactive
+                            </span>
+
+                        {% endif %}
+
+                    </td>
+
+                    <td>
+
+                        <div class="admin-actions">
+
+                            <a class="button ghost"
+                               href="{% url 'user-update' account.id %}">
+
+                                Edit User
+
+                            </a>
+
+
+                            <form method="post"
+                                  action="{% url 'user-toggle-active' account.id %}">
+
+                                {% csrf_token %}
+
+                                <button class="button ghost"
+                                        type="submit">
+
+                                    {% if account.is_active %}
+                                        Deactivate
+                                    {% else %}
+                                        Activate
+                                    {% endif %}
+
+                                </button>
+
+                            </form>
+
+                        </div>
+
+                    </td>
+
+                </tr>
+
+            {% empty %}
+
+                <tr>
+
+                    <td colspan="6"
+                        class="empty-row">
+
+                        No user accounts available yet.
+
+                    </td>
+
+                </tr>
+
+            {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</section>
+
+{% endblock %}

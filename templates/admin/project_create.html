@@ -1,0 +1,537 @@
+{% extends 'admin/adminbase.html' %}
+
+{% block title %}
+Create Project
+{% endblock %}
+
+{% block content %}
+
+<style>
+
+.page-container{
+    max-width:1400px;
+    margin:auto;
+}
+
+.hero{
+    background:linear-gradient(135deg,#2563eb,#1d4ed8);
+    color:white;
+    padding:35px;
+    border-radius:20px;
+    margin-bottom:25px;
+}
+
+.hero h2{
+    margin:0;
+    font-size:32px;
+}
+
+.hero p{
+    margin-top:10px;
+    opacity:.9;
+}
+
+.content-grid{
+    display:grid;
+    grid-template-columns:2fr 1fr;
+    gap:25px;
+}
+
+.card{
+    background:white;
+    border-radius:18px;
+    padding:25px;
+    box-shadow:0 4px 15px rgba(0,0,0,.08);
+}
+
+.card-title{
+    font-size:22px;
+    font-weight:700;
+    margin-bottom:20px;
+    color:#1e293b;
+}
+
+.form-group{
+    margin-bottom:20px;
+}
+
+.form-group label{
+    display:block;
+    margin-bottom:8px;
+    font-weight:600;
+    color:#334155;
+}
+
+.form-group input,
+.form-group textarea,
+.form-group select{
+    width:100%;
+    padding:12px;
+    border:1px solid #d1d5db;
+    border-radius:10px;
+    font-size:14px;
+    box-sizing:border-box;
+}
+
+.form-group textarea{
+    resize:vertical;
+}
+
+.helptext{
+    display:block;
+    margin-top:6px;
+    font-size:12px;
+    color:#64748b;
+}
+
+.errorlist{
+    list-style:none;
+    padding:0;
+    margin-top:6px;
+    color:#dc2626;
+}
+
+.actions{
+    margin-top:25px;
+    display:flex;
+    gap:12px;
+    justify-content:flex-end;
+}
+
+.btn{
+    border:none;
+    padding:12px 18px;
+    border-radius:10px;
+    font-weight:600;
+    cursor:pointer;
+    text-decoration:none;
+}
+
+.btn-primary{
+    background:#2563eb;
+    color:white;
+}
+
+.btn-secondary{
+    background:#e5e7eb;
+    color:#374151;
+}
+
+.ai-card{
+    background:linear-gradient(135deg,#eff6ff,#dbeafe);
+    border-left:5px solid #2563eb;
+}
+
+.ai-card h3{
+    margin-top:0;
+    color:#1e40af;
+}
+
+.ai-score{
+    font-size:42px;
+    font-weight:700;
+    color:#2563eb;
+    margin:15px 0;
+}
+
+.info-box{
+    background:white;
+    padding:15px;
+    border-radius:12px;
+    margin-top:15px;
+}
+
+.info-box strong{
+    color:#1e293b;
+}
+
+.recommendation-box{
+    display:none;
+}
+
+.recommendation-item{
+    margin-bottom:12px;
+}
+
+.recommendation-item span{
+    font-weight:600;
+    color:#2563eb;
+}
+
+.loading{
+    display:none;
+    margin-top:15px;
+    color:#2563eb;
+    font-weight:600;
+}
+
+.use-team-btn{
+    width:100%;
+    margin-top:15px;
+    background:#059669;
+    color:white;
+}
+
+@media(max-width:900px){
+
+    .content-grid{
+        grid-template-columns:1fr;
+    }
+
+}
+
+</style>
+
+<div class="page-container">
+
+    <div class="hero">
+
+        <h2>Create Project</h2>
+
+        <p>
+            Create a new project and let AI recommend
+            the most suitable team based on skills,
+            availability and workload.
+        </p>
+
+    </div>
+
+    <div class="content-grid">
+
+        <div class="card">
+
+            <div class="card-title">
+
+                Project Information
+
+            </div>
+
+            <form method="post">
+
+                {% csrf_token %}
+
+                <div class="form-group">
+
+                    <label>Project Name</label>
+
+                    {{ form.name }}
+
+                    {{ form.name.errors }}
+
+                </div>
+
+                <div class="form-group">
+
+                    <label>Team</label>
+
+                    {{ form.team }}
+
+                    {{ form.team.errors }}
+
+                </div>
+
+                <div class="form-group">
+
+                    <label>Description</label>
+
+                    {{ form.description }}
+
+                    {{ form.description.errors }}
+
+                </div>
+
+                <div class="form-group">
+
+                    <label>Required Skills</label>
+
+                    {{ form.required_skills }}
+
+                    <small class="helptext">
+                        Example:
+                        Python, Django, REST API, SQL
+                    </small>
+
+                    {{ form.required_skills.errors }}
+
+                </div>
+
+                <div class="form-group">
+
+                    <label>Deadline</label>
+
+                    {{ form.deadline }}
+
+                    {{ form.deadline.errors }}
+
+                </div>
+
+                <div class="form-group">
+
+                    <label>Status</label>
+
+                    {{ form.status }}
+
+                    {{ form.status.errors }}
+
+                </div>
+
+                <div class="actions">
+
+                    <a href="{% url 'project-list' %}"
+                       class="btn btn-secondary">
+
+                        Cancel
+
+                    </a>
+
+                    <button type="submit"
+                            class="btn btn-primary">
+
+                        Create Project
+
+                    </button>
+
+                </div>
+
+            </form>
+
+        </div>
+
+        <div class="card ai-card">
+
+            <h3>
+
+                AI Team Recommendation
+
+            </h3>
+
+            <p>
+
+                Analyze skills, availability,
+                workload and experience to find
+                the best team.
+
+            </p>
+
+            <button
+                type="button"
+                id="analyzeBtn"
+                class="btn btn-primary">
+
+                Analyze Team
+
+            </button>
+
+            <div
+                id="loading"
+                class="loading">
+
+                Analyzing teams...
+
+            </div>
+
+            <div
+                id="recommendationBox"
+                class="recommendation-box">
+
+                <div class="ai-score"
+                     id="score">
+                </div>
+
+                <div class="info-box">
+
+                    <strong>
+                        Recommended Team
+                    </strong>
+
+                    <br><br>
+
+                    <span id="teamName">
+                    </span>
+
+                </div>
+
+                <div class="info-box">
+
+                    <div class="recommendation-item">
+
+                        Skill Match:
+                        <span id="skillMatch"></span>%
+
+                    </div>
+
+                    <div class="recommendation-item">
+
+                        Available Members:
+                        <span id="availability"></span>
+
+                    </div>
+
+                    <div class="recommendation-item">
+
+                        Team Experience:
+                        <span id="experience"></span>
+                        years
+
+                    </div>
+
+                    <div class="recommendation-item">
+
+                        Active Tasks:
+                        <span id="workload"></span>
+
+                    </div>
+
+                </div>
+
+                <button
+                    type="button"
+                    id="useTeamBtn"
+                    class="btn use-team-btn">
+
+                    Use Recommended Team
+
+                </button>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+
+let recommendedTeamId = null;
+
+document
+.getElementById("analyzeBtn")
+.addEventListener("click", function(){
+
+    let skills =
+    document.getElementById(
+        "id_required_skills"
+    ).value;
+
+    if(!skills){
+
+        alert(
+            "Please enter required skills first."
+        );
+
+        return;
+    }
+
+    document
+    .getElementById("loading")
+    .style.display = "block";
+
+    fetch(
+        "{% url 'recommend-team' %}",
+        {
+
+            method:"POST",
+
+            headers:{
+                "X-CSRFToken":
+                document.querySelector(
+                    "[name=csrfmiddlewaretoken]"
+                ).value,
+
+                "Content-Type":
+                "application/x-www-form-urlencoded"
+            },
+
+            body:
+            "skills=" +
+            encodeURIComponent(skills)
+
+        }
+
+    )
+
+    .then(
+        response => response.json()
+    )
+
+    .then(data => {
+
+        document
+        .getElementById("loading")
+        .style.display = "none";
+
+        if(data.success){
+
+            recommendedTeamId =
+            data.team_id;
+
+            document
+            .getElementById(
+                "recommendationBox"
+            )
+            .style.display = "block";
+
+            document
+            .getElementById(
+                "teamName"
+            )
+            .innerText =
+            data.team;
+
+            document
+            .getElementById(
+                "score"
+            )
+            .innerText =
+            data.score + "%";
+
+            document
+            .getElementById(
+                "skillMatch"
+            )
+            .innerText =
+            data.skill_match;
+
+            document
+            .getElementById(
+                "availability"
+            )
+            .innerText =
+            data.availability;
+
+            document
+            .getElementById(
+                "experience"
+            )
+            .innerText =
+            data.experience;
+
+            document
+            .getElementById(
+                "workload"
+            )
+            .innerText =
+            data.workload;
+        }
+    });
+
+});
+
+document
+.getElementById("useTeamBtn")
+.addEventListener("click", function(){
+
+    if(!recommendedTeamId)
+        return;
+
+    document
+    .getElementById("id_team")
+    .value =
+    recommendedTeamId;
+
+});
+
+</script>
+
+{% endblock %}

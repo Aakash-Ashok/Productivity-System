@@ -52,6 +52,10 @@
                     {% if is_admin_role %}
                         <td><a class="button ghost" href="{% url 'project-update' project.pk %}">Edit Project</a></td>
                     {% endif %}
+                    <a href="{% url 'project-detail' project.pk %}"
+   class="button">
+    View
+</a>
                 </tr>
             {% empty %}
                 <tr>

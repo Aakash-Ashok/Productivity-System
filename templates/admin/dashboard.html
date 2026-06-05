@@ -1,2 +1,411 @@
 {% extends 'admin/adminbase.html' %}
-{% block content %}{% include 'partials/dashboard_content.html' %}{% endblock %}
+
+{% block content %}
+
+<style>
+
+.dashboard-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:30px;
+    flex-wrap:wrap;
+    gap:20px;
+}
+
+.dashboard-title h1{
+    font-size:32px;
+    margin-bottom:8px;
+    color:#1e293b;
+}
+
+.dashboard-title p{
+    color:#64748b;
+}
+
+.quick-actions{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+}
+
+.btn-action{
+    padding:10px 18px;
+    border-radius:12px;
+    text-decoration:none;
+    background:#4f46e5;
+    color:white;
+    font-weight:600;
+}
+
+.stats-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+    gap:20px;
+    margin-bottom:25px;
+}
+
+.stat-card{
+    background:white;
+    border-radius:20px;
+    padding:24px;
+    box-shadow:0 10px 25px rgba(0,0,0,.05);
+}
+
+.stat-card span{
+    display:block;
+    color:#64748b;
+    margin-bottom:10px;
+}
+
+.stat-card strong{
+    font-size:32px;
+    color:#111827;
+}
+
+.main-grid{
+    display:grid;
+    grid-template-columns:2fr 1fr;
+    gap:20px;
+}
+
+.panel{
+    background:white;
+    border-radius:20px;
+    padding:24px;
+    margin-bottom:20px;
+    box-shadow:0 10px 25px rgba(0,0,0,.05);
+}
+
+.panel h3{
+    margin-bottom:20px;
+    color:#1e293b;
+}
+
+.list-item{
+    padding:12px 0;
+    border-bottom:1px solid #e5e7eb;
+}
+
+.list-item:last-child{
+    border-bottom:none;
+}
+
+.badge{
+    display:inline-block;
+    padding:4px 10px;
+    border-radius:999px;
+    font-size:12px;
+    background:#eef2ff;
+    color:#4f46e5;
+    font-weight:600;
+}
+
+.progress{
+    width:100%;
+    background:#e5e7eb;
+    height:10px;
+    border-radius:999px;
+    overflow:hidden;
+    margin-top:8px;
+}
+
+.progress-bar{
+    height:100%;
+    background:#4f46e5;
+}
+
+.table{
+    width:100%;
+    border-collapse:collapse;
+}
+
+.table th{
+    background:#f8fafc;
+    padding:12px;
+    text-align:left;
+}
+
+.table td{
+    padding:12px;
+    border-top:1px solid #e5e7eb;
+}
+
+.alert-danger{
+    color:#dc2626;
+    font-weight:600;
+}
+
+.alert-warning{
+    color:#f59e0b;
+    font-weight:600;
+}
+
+@media(max-width:992px){
+    .main-grid{
+        grid-template-columns:1fr;
+    }
+}
+
+</style>
+
+<div class="dashboard-header">
+
+    <div class="dashboard-title">
+        <h1>Admin Dashboard</h1>
+        <p>Organization overview, analytics and AI insights.</p>
+    </div>
+
+    <div class="quick-actions">
+
+        <a href="{% url 'user-create' %}" class="btn-action">
+            Create User
+        </a>
+
+        <a href="{% url 'team-create' %}" class="btn-action">
+            Create Team
+        </a>
+
+        <a href="{% url 'project-create' %}" class="btn-action">
+            Create Project
+        </a>
+
+    </div>
+
+</div>
+
+<div class="stats-grid">
+
+    <div class="stat-card">
+        <span>Total Users</span>
+        <strong>{{ total_users }}</strong>
+    </div>
+
+    <div class="stat-card">
+        <span>Total Teams</span>
+        <strong>{{ total_teams }}</strong>
+    </div>
+
+    <div class="stat-card">
+        <span>Total Employees</span>
+        <strong>{{ total_employees }}</strong>
+    </div>
+
+    <div class="stat-card">
+        <span>Total Projects</span>
+        <strong>{{ total_projects }}</strong>
+    </div>
+
+    <div class="stat-card">
+        <span>Total Tasks</span>
+        <strong>{{ total_tasks }}</strong>
+    </div>
+
+    <div class="stat-card">
+        <span>Completion Rate</span>
+        <strong>{{ completion_rate }}%</strong>
+    </div>
+
+</div>
+
+<div class="main-grid">
+
+    <div>
+
+        <div class="panel">
+
+            <h3>Project Progress Overview</h3>
+
+            {% for row in project_summary %}
+
+            <div class="list-item">
+
+                <strong>{{ row.project.name }}</strong>
+
+                <div class="progress">
+                    <div class="progress-bar"
+                         style="width:{{ row.progress }}%">
+                    </div>
+                </div>
+
+                {{ row.progress }}%
+
+            </div>
+
+            {% empty %}
+                <p>No projects available.</p>
+            {% endfor %}
+
+        </div>
+
+        <div class="panel">
+
+            <h3>Approval Queue</h3>
+
+            <table class="table">
+
+                <thead>
+                    <tr>
+                        <th>Task</th>
+                        <th>Project</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                {% for task in approval_queue %}
+                    <tr>
+                        <td>{{ task.title }}</td>
+                        <td>{{ task.project.name }}</td>
+                        <td>{{ task.get_status_display }}</td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="3">
+                            No pending approvals
+                        </td>
+                    </tr>
+                {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+        <div class="panel">
+
+            <h3>Project Risk Analysis</h3>
+
+            {% for row in top_risky_projects %}
+
+            <div class="list-item">
+
+                <strong>
+                    {{ row.project.name }}
+                </strong>
+
+                <br>
+
+                Delay Risk:
+                {{ row.delay_risk }}%
+
+                <br>
+
+                Confidence:
+                {{ row.completion_confidence }}%
+
+            </div>
+
+            {% empty %}
+                <p>No project risks found.</p>
+            {% endfor %}
+
+        </div>
+
+    </div>
+
+    <div>
+
+        <div class="panel">
+
+            <h3>Top Performers</h3>
+
+            {% for row in top_performers %}
+
+            <div class="list-item">
+
+                <strong>
+                    {{ row.employee.name }}
+                </strong>
+
+                <br>
+
+                Completion:
+                {{ row.completion_rate }}%
+
+            </div>
+
+            {% empty %}
+                <p>No data available.</p>
+            {% endfor %}
+
+        </div>
+
+        <div class="panel">
+
+            <h3>Burnout Alerts</h3>
+
+            {% for row in burnout_alerts %}
+
+            <div class="list-item">
+
+                <strong>
+                    {{ row.employee.name }}
+                </strong>
+
+                <br>
+
+                Active Tasks:
+                {{ row.active_tasks }}
+
+                <br>
+
+                <span class="alert-danger">
+                    {{ row.burnout_risk }}
+                </span>
+
+            </div>
+
+            {% empty %}
+                <p>No burnout alerts.</p>
+            {% endfor %}
+
+        </div>
+
+        <div class="panel">
+
+            <h3>Upcoming Deadlines</h3>
+
+            {% for task in upcoming_deadlines %}
+
+            <div class="list-item">
+
+                <strong>
+                    {{ task.title }}
+                </strong>
+
+                <br>
+
+                {{ task.deadline }}
+
+            </div>
+
+            {% empty %}
+                <p>No upcoming deadlines.</p>
+            {% endfor %}
+
+        </div>
+
+        <div class="panel">
+
+            <h3>Notifications</h3>
+
+            {% for item in notifications %}
+
+            <div class="list-item">
+                {{ item.message }}
+            </div>
+
+            {% empty %}
+                <p>No notifications.</p>
+            {% endfor %}
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}

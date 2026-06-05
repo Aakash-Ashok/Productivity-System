@@ -1,0 +1,484 @@
+{% extends 'admin/adminbase.html' %}
+
+{% block content %}
+
+<style>
+
+.page-wrapper{
+    display:flex;
+    flex-direction:column;
+    gap:24px;
+}
+
+.hero{
+    background:white;
+    border:1px solid #e5e7eb;
+    border-radius:22px;
+    padding:28px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+}
+
+.hero-title{
+    font-size:30px;
+    font-weight:700;
+    color:#111827;
+}
+
+.hero-subtitle{
+    color:#6b7280;
+    margin-top:6px;
+}
+
+.btn{
+    text-decoration:none;
+    padding:12px 18px;
+    border-radius:10px;
+    font-weight:600;
+}
+
+.btn-dark{
+    background:#111827;
+    color:white;
+}
+
+.stats-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+    gap:18px;
+}
+
+.card{
+    background:white;
+    border:1px solid #e5e7eb;
+    border-radius:20px;
+    padding:22px;
+}
+
+.stat-label{
+    color:#6b7280;
+    font-size:13px;
+}
+
+.stat-value{
+    font-size:34px;
+    font-weight:700;
+    margin-top:8px;
+    color:#111827;
+}
+
+.section-title{
+    font-size:22px;
+    font-weight:700;
+    margin-bottom:20px;
+    color:#111827;
+}
+
+.grid-2{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:24px;
+}
+
+.info-row{
+    display:flex;
+    justify-content:space-between;
+    padding:12px 0;
+    border-bottom:1px solid #f3f4f6;
+}
+
+.health-score{
+    font-size:48px;
+    font-weight:700;
+    color:#111827;
+}
+
+.badge{
+    padding:6px 12px;
+    border-radius:999px;
+    font-size:12px;
+    font-weight:600;
+}
+
+.low{
+    background:#dcfce7;
+    color:#166534;
+}
+
+.medium{
+    background:#fef3c7;
+    color:#92400e;
+}
+
+.high{
+    background:#fee2e2;
+    color:#991b1b;
+}
+
+.table-wrapper{
+    overflow-x:auto;
+}
+
+table{
+    width:100%;
+    border-collapse:collapse;
+}
+
+thead{
+    background:#f9fafb;
+}
+
+th,td{
+    padding:14px;
+    text-align:left;
+    border-bottom:1px solid #f3f4f6;
+}
+
+.project-progress{
+    width:100%;
+    height:8px;
+    background:#e5e7eb;
+    border-radius:999px;
+    overflow:hidden;
+}
+
+.project-progress-fill{
+    height:100%;
+    background:#111827;
+}
+
+.action-btn{
+    text-decoration:none;
+    padding:8px 12px;
+    background:#111827;
+    color:white;
+    border-radius:8px;
+    font-size:13px;
+}
+
+</style>
+
+<div class="page-wrapper">
+
+```
+<section class="hero">
+
+    <div>
+
+        <div class="hero-title">
+            {{ team.name }}
+        </div>
+
+        <div class="hero-subtitle">
+            Team Management Dashboard
+        </div>
+
+    </div>
+
+    <a href="{% url 'team-update' team.pk %}"
+       class="btn btn-dark">
+
+        Edit Team
+
+    </a>
+
+</section>
+
+<section class="stats-grid">
+
+    <article class="card">
+        <div class="stat-label">Members</div>
+        <div class="stat-value">{{ employee_count }}</div>
+    </article>
+
+    <article class="card">
+        <div class="stat-label">Projects</div>
+        <div class="stat-value">{{ project_count }}</div>
+    </article>
+
+    <article class="card">
+        <div class="stat-label">Active Tasks</div>
+        <div class="stat-value">{{ active_tasks }}</div>
+    </article>
+
+    <article class="card">
+        <div class="stat-label">Completed Tasks</div>
+        <div class="stat-value">{{ completed_tasks }}</div>
+    </article>
+
+    <article class="card">
+        <div class="stat-label">Health Score</div>
+        <div class="stat-value">{{ team_health.health_score }}</div>
+    </article>
+
+    <article class="card">
+        <div class="stat-label">Burnout Alerts</div>
+        <div class="stat-value">{{ team_health.burnout_count }}</div>
+    </article>
+
+</section>
+
+<div class="grid-2">
+
+    <section class="card">
+
+        <div class="section-title">
+            Team Information
+        </div>
+
+        <div class="info-row">
+            <strong>Manager</strong>
+            <span>
+                {% if team.manager %}
+                    {{ team.manager.get_full_name|default:team.manager.username }}
+                {% else %}
+                    Not Assigned
+                {% endif %}
+            </span>
+        </div>
+
+        <div class="info-row">
+            <strong>Description</strong>
+            <span>{{ team.description }}</span>
+        </div>
+
+    </section>
+
+    <section class="card">
+
+        <div class="section-title">
+            AI Team Insights
+        </div>
+
+        <div class="health-score">
+            {{ team_health.health_score }}
+        </div>
+
+        <div class="info-row">
+            <strong>Burnout Count</strong>
+            <span>{{ team_health.burnout_count }}</span>
+        </div>
+
+        <div class="info-row">
+            <strong>Active Tasks</strong>
+            <span>{{ team_health.active_tasks }}</span>
+        </div>
+
+        <div class="info-row">
+            <strong>Recommendation</strong>
+            <span>{{ team_health.recommended_action }}</span>
+        </div>
+
+    </section>
+
+</div>
+
+<section class="card">
+
+    <div class="section-title">
+        Team Analytics
+    </div>
+
+    <div class="stats-grid">
+
+        <article class="card">
+            <div class="stat-label">Available</div>
+            <div class="stat-value">
+                {{ team_analytics.available_members }}
+            </div>
+        </article>
+
+        <article class="card">
+            <div class="stat-label">Busy</div>
+            <div class="stat-value">
+                {{ team_analytics.busy_members }}
+            </div>
+        </article>
+
+        <article class="card">
+            <div class="stat-label">Overloaded</div>
+            <div class="stat-value">
+                {{ team_analytics.overloaded_members }}
+            </div>
+        </article>
+
+        <article class="card">
+            <div class="stat-label">On Leave</div>
+            <div class="stat-value">
+                {{ team_analytics.leave_members }}
+            </div>
+        </article>
+
+        <article class="card">
+            <div class="stat-label">Avg Experience</div>
+            <div class="stat-value">
+                {{ team_analytics.avg_experience }}
+            </div>
+        </article>
+
+        <article class="card">
+            <div class="stat-label">Avg Productivity</div>
+            <div class="stat-value">
+                {{ team_analytics.avg_productivity }}
+            </div>
+        </article>
+
+    </div>
+
+</section>
+
+<section class="card">
+
+    <div class="section-title">
+        Team Member Performance
+    </div>
+
+    <div class="table-wrapper">
+
+        <table>
+
+            <thead>
+                <tr>
+                    <th>Employee</th>
+                    <th>Availability</th>
+                    <th>Completed</th>
+                    <th>Active</th>
+                    <th>Productivity</th>
+                    <th>Burnout Risk</th>
+                </tr>
+            </thead>
+
+            <tbody>
+
+            {% for member in member_performance %}
+
+                <tr>
+
+                    <td>
+                        {{ member.employee.name }}
+                    </td>
+
+                    <td>
+                        {{ member.employee.get_availability_display }}
+                    </td>
+
+                    <td>
+                        {{ member.completed_tasks }}
+                    </td>
+
+                    <td>
+                        {{ member.active_tasks }}
+                    </td>
+
+                    <td>
+                        {{ member.productivity_score }}
+                    </td>
+
+                    <td>
+
+                        <span class="badge
+                        {% if member.burnout_risk == 'Low' %}
+                            low
+                        {% elif member.burnout_risk == 'Medium' %}
+                            medium
+                        {% else %}
+                            high
+                        {% endif %}
+                        ">
+
+                            {{ member.burnout_risk }}
+
+                        </span>
+
+                    </td>
+
+                </tr>
+
+            {% empty %}
+
+                <tr>
+                    <td colspan="6">
+                        No employees assigned.
+                    </td>
+                </tr>
+
+            {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</section>
+
+<section class="card">
+
+    <div class="section-title">
+        Team Projects
+    </div>
+
+    <div class="table-wrapper">
+
+        <table>
+
+            <thead>
+                <tr>
+                    <th>Project</th>
+                    <th>Status</th>
+                    <th>Progress</th>
+                    <th>Deadline</th>
+                </tr>
+            </thead>
+
+            <tbody>
+
+            {% for project in projects %}
+
+                <tr>
+
+                    <td>{{ project.name }}</td>
+
+                    <td>{{ project.get_status_display }}</td>
+
+                    <td>
+
+                        {{ project.progress }}%
+
+                        <div class="project-progress">
+
+                            <div class="project-progress-fill"
+                                 style="width:{{ project.progress }}%;">
+                            </div>
+
+                        </div>
+
+                    </td>
+
+                    <td>{{ project.deadline }}</td>
+
+                </tr>
+
+            {% empty %}
+
+                <tr>
+                    <td colspan="4">
+                        No projects assigned.
+                    </td>
+                </tr>
+
+            {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</section>
+```
+
+</div>
+
+{% endblock %}

@@ -1,2 +1,259 @@
 {% extends 'employee/employeebase.html' %}
-{% block content %}{% include 'partials/dashboard_content.html' %}{% endblock %}
+
+{% block content %}
+
+<style>
+
+.dashboard-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:30px;
+    flex-wrap:wrap;
+}
+
+.dashboard-title h1{
+    font-size:32px;
+    margin-bottom:8px;
+    color:#1e293b;
+}
+
+.dashboard-title p{
+    color:#64748b;
+}
+
+.quick-actions{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+}
+
+.btn-action{
+    padding:10px 18px;
+    border-radius:12px;
+    background:#4f46e5;
+    color:white;
+    text-decoration:none;
+    font-weight:600;
+}
+
+.stats-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+    gap:20px;
+    margin-bottom:25px;
+}
+
+.stat-card{
+    background:white;
+    border-radius:20px;
+    padding:24px;
+    box-shadow:0 10px 25px rgba(0,0,0,.05);
+}
+
+.stat-card span{
+    display:block;
+    margin-bottom:10px;
+    color:#64748b;
+}
+
+.stat-card strong{
+    font-size:30px;
+    color:#111827;
+}
+
+.main-grid{
+    display:grid;
+    grid-template-columns:2fr 1fr;
+    gap:20px;
+}
+
+.panel{
+    background:white;
+    border-radius:20px;
+    padding:24px;
+    margin-bottom:20px;
+    box-shadow:0 10px 25px rgba(0,0,0,.05);
+}
+
+.panel h3{
+    margin-bottom:20px;
+}
+
+.list-item{
+    padding:12px 0;
+    border-bottom:1px solid #e5e7eb;
+}
+
+.ai-card{
+    background:linear-gradient(135deg,#4f46e5,#7c3aed);
+    color:white;
+    border-radius:20px;
+    padding:24px;
+}
+
+.ai-card h3{
+    color:white;
+    margin-bottom:20px;
+}
+
+@media(max-width:992px){
+    .main-grid{
+        grid-template-columns:1fr;
+    }
+}
+
+</style>
+
+<div class="dashboard-header">
+
+    <div class="dashboard-title">
+        <h1>My Dashboard</h1>
+        <p>Track progress, productivity and daily work.</p>
+    </div>
+
+    <div class="quick-actions">
+
+        <a href="{% url 'tasklog-create' %}" class="btn-action">
+            Log Work
+        </a>
+
+        <a href="{% url 'leave-request-create' %}" class="btn-action">
+            Request Leave
+        </a>
+
+        <a href="{% url 'analytics' %}" class="btn-action">
+            My Analytics
+        </a>
+
+    </div>
+
+</div>
+
+<div class="stats-grid">
+
+    <div class="stat-card">
+        <span>Assigned Tasks</span>
+        <strong>{{ my_tasks|length }}</strong>
+    </div>
+
+    <div class="stat-card">
+        <span>Completed Tasks</span>
+        <strong>{{ my_completed_tasks }}</strong>
+    </div>
+
+    <div class="stat-card">
+        <span>Pending Tasks</span>
+        <strong>{{ my_pending_tasks }}</strong>
+    </div>
+
+    <div class="stat-card">
+        <span>Work Logs</span>
+        <strong>{{ my_logs|length }}</strong>
+    </div>
+
+</div>
+
+<div class="main-grid">
+
+    <div>
+
+        <div class="panel">
+
+            <h3>Upcoming Tasks</h3>
+
+            {% for task in my_due_soon %}
+            <div class="list-item">
+                <strong>{{ task.title }}</strong>
+                <br>
+                Due : {{ task.deadline }}
+            </div>
+            {% empty %}
+            <p>No upcoming tasks.</p>
+            {% endfor %}
+
+        </div>
+
+        <div class="panel">
+
+            <h3>Recent Work Logs</h3>
+
+            {% for log in my_logs %}
+            <div class="list-item">
+                <strong>{{ log.task.title }}</strong>
+                <br>
+                {{ log.hours_spent }} Hours
+            </div>
+            {% empty %}
+            <p>No logs available.</p>
+            {% endfor %}
+
+        </div>
+
+        <div class="panel">
+
+            <h3>My Requests</h3>
+
+            {% for item in recent_requests %}
+            <div class="list-item">
+                {{ item.get_request_type_display }}
+                <br>
+                {{ item.get_status_display }}
+            </div>
+            {% empty %}
+            <p>No requests.</p>
+            {% endfor %}
+
+        </div>
+
+    </div>
+
+    <div>
+
+        {% if my_ai_profile %}
+        <div class="ai-card">
+
+            <h3>My AI Profile</h3>
+
+            <p>
+                <strong>Productivity Score:</strong>
+                {{ my_ai_profile.productivity_score }}/100
+            </p>
+
+            <p>
+                <strong>Burnout Risk:</strong>
+                {{ my_ai_profile.burnout_risk }}
+            </p>
+
+            <p>
+                <strong>Focus Area:</strong>
+                {{ my_ai_profile.focus_area }}
+            </p>
+
+            <p>
+                <strong>Learning Priority:</strong>
+                {{ my_ai_profile.learning_priority|join:", " }}
+            </p>
+
+        </div>
+        {% endif %}
+
+        <div class="panel">
+
+            <h3>Notifications</h3>
+
+            {% for item in notifications %}
+            <div class="list-item">
+                {{ item.message }}
+            </div>
+            {% empty %}
+            <p>No notifications.</p>
+            {% endfor %}
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}

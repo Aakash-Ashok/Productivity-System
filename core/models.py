@@ -6,6 +6,7 @@ from django.contrib.auth.models import Group, User
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils import timezone
+from django.core.validators import FileExtensionValidator
 
 
 class AppRole(models.TextChoices):
@@ -114,6 +115,9 @@ class Project(models.Model):
     team = models.ForeignKey(Team, on_delete=models.SET_NULL, null=True, blank=True, related_name='projects')
     description = models.TextField(blank=True)
     deadline = models.DateField()
+    required_skills = models.TextField(
+    blank=True
+)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PLANNING)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -126,10 +130,29 @@ class Project(models.Model):
 
     @property
     def progress(self) -> int:
-        task_progress = list(self.tasks.values_list('progress', flat=True))
-        if not task_progress:
+
+        tasks = self.tasks.all()
+
+        if not tasks.exists():
             return 0
-        return round(sum(task_progress) / len(task_progress))
+
+        total_weight = 0
+        completed_weight = 0
+
+        for task in tasks:
+            hours = float(task.estimated_hours)
+
+            total_weight += hours
+            completed_weight += (
+                hours * task.progress / 100
+            )
+
+        if total_weight == 0:
+            return 0
+
+        return round(
+            (completed_weight / total_weight) * 100
+        )
 
 
 class Task(models.Model):
@@ -295,7 +318,23 @@ class Activity(models.Model):
 class Attachment(models.Model):
     task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name='attachments')
     uploaded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='attachments')
-    file = models.FileField(upload_to='task_attachments/')
+    file = models.FileField(
+    upload_to='task_attachments/',
+    validators=[
+        FileExtensionValidator(
+            allowed_extensions=[
+                "pdf",
+                "doc",
+                "docx",
+                "xls",
+                "xlsx",
+                "png",
+                "jpg",
+                "jpeg"
+            ]
+        )
+    ]
+)
     label = models.CharField(max_length=180)
     created_at = models.DateTimeField(auto_now_add=True)
 

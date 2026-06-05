@@ -1,0 +1,403 @@
+{% extends 'employee/employeebase.html' %}
+
+{% block content %}
+
+<style>
+
+.page-wrapper{
+    display:flex;
+    flex-direction:column;
+    gap:24px;
+}
+
+.hero{
+    background:white;
+    border:1px solid #e5e7eb;
+    border-radius:22px;
+    padding:28px;
+}
+
+.hero-title{
+    font-size:30px;
+    font-weight:700;
+    color:#111827;
+}
+
+.hero-subtitle{
+    color:#6b7280;
+    margin-top:6px;
+}
+
+.stats-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+    gap:18px;
+}
+
+.card{
+    background:white;
+    border:1px solid #e5e7eb;
+    border-radius:20px;
+    padding:22px;
+}
+
+.stat-label{
+    color:#6b7280;
+    font-size:13px;
+}
+
+.stat-value{
+    font-size:34px;
+    font-weight:700;
+    margin-top:8px;
+    color:#111827;
+}
+
+.section-title{
+    font-size:22px;
+    font-weight:700;
+    margin-bottom:20px;
+    color:#111827;
+}
+
+.grid-2{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:24px;
+}
+
+.info-row{
+    display:flex;
+    justify-content:space-between;
+    padding:12px 0;
+    border-bottom:1px solid #f3f4f6;
+}
+
+.health-score{
+    font-size:48px;
+    font-weight:700;
+    color:#111827;
+}
+
+.badge{
+    display:inline-block;
+    padding:6px 12px;
+    border-radius:999px;
+    font-size:12px;
+    font-weight:600;
+}
+
+.available{
+    background:#dcfce7;
+    color:#166534;
+}
+
+.busy{
+    background:#fef3c7;
+    color:#92400e;
+}
+
+.overloaded{
+    background:#fee2e2;
+    color:#991b1b;
+}
+
+.leave{
+    background:#dbeafe;
+    color:#1d4ed8;
+}
+
+.table-wrapper{
+    overflow-x:auto;
+}
+
+table{
+    width:100%;
+    border-collapse:collapse;
+}
+
+thead{
+    background:#f9fafb;
+}
+
+th,td{
+    padding:14px;
+    text-align:left;
+    border-bottom:1px solid #f3f4f6;
+}
+
+.project-progress{
+    width:100%;
+    height:8px;
+    background:#e5e7eb;
+    border-radius:999px;
+    overflow:hidden;
+}
+
+.project-progress-fill{
+    height:100%;
+    background:#111827;
+}
+
+@media(max-width:900px){
+
+    .grid-2{
+        grid-template-columns:1fr;
+    }
+
+}
+
+</style>
+
+<div class="page-wrapper">
+
+```
+<section class="hero">
+
+    <div class="hero-title">
+        {{ team.name }}
+    </div>
+
+    <div class="hero-subtitle">
+        My Team Overview
+    </div>
+
+</section>
+
+<section class="stats-grid">
+
+    <article class="card">
+        <div class="stat-label">Team Members</div>
+        <div class="stat-value">{{ employee_count }}</div>
+    </article>
+
+    <article class="card">
+        <div class="stat-label">Projects</div>
+        <div class="stat-value">{{ project_count }}</div>
+    </article>
+
+    <article class="card">
+        <div class="stat-label">Health Score</div>
+        <div class="stat-value">{{ team_health.health_score }}</div>
+    </article>
+
+    <article class="card">
+        <div class="stat-label">Active Tasks</div>
+        <div class="stat-value">{{ active_tasks }}</div>
+    </article>
+
+</section>
+
+<div class="grid-2">
+
+    <section class="card">
+
+        <div class="section-title">
+            Team Information
+        </div>
+
+        <div class="info-row">
+            <strong>Manager</strong>
+            <span>
+                {{ team.manager.get_full_name|default:team.manager.username }}
+            </span>
+        </div>
+
+        <div class="info-row">
+            <strong>Description</strong>
+            <span>
+                {{ team.description }}
+            </span>
+        </div>
+
+    </section>
+
+    <section class="card">
+
+        <div class="section-title">
+            Team Health
+        </div>
+
+        <div class="health-score">
+            {{ team_health.health_score }}
+        </div>
+
+        <div class="info-row">
+            <strong>Current Workload</strong>
+            <span>
+                {{ team_health.active_tasks }} Tasks
+            </span>
+        </div>
+
+        <div class="info-row">
+            <strong>Recommendation</strong>
+            <span>
+                {{ team_health.recommended_action }}
+            </span>
+        </div>
+
+    </section>
+
+</div>
+
+<section class="card">
+
+    <div class="section-title">
+        Team Members
+    </div>
+
+    <div class="table-wrapper">
+
+        <table>
+
+            <thead>
+
+                <tr>
+                    <th>Name</th>
+                    <th>Job Title</th>
+                    <th>Availability</th>
+                </tr>
+
+            </thead>
+
+            <tbody>
+
+            {% for employee in employees %}
+
+                <tr>
+
+                    <td>
+                        {{ employee.name }}
+                    </td>
+
+                    <td>
+                        {{ employee.job_title }}
+                    </td>
+
+                    <td>
+
+                        {% if employee.availability == 'available' %}
+                            <span class="badge available">
+                                Available
+                            </span>
+
+                        {% elif employee.availability == 'busy' %}
+                            <span class="badge busy">
+                                Busy
+                            </span>
+
+                        {% elif employee.availability == 'overloaded' %}
+                            <span class="badge overloaded">
+                                Overloaded
+                            </span>
+
+                        {% else %}
+                            <span class="badge leave">
+                                On Leave
+                            </span>
+
+                        {% endif %}
+
+                    </td>
+
+                </tr>
+
+            {% empty %}
+
+                <tr>
+
+                    <td colspan="3">
+                        No team members found.
+                    </td>
+
+                </tr>
+
+            {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</section>
+
+<section class="card">
+
+    <div class="section-title">
+        Current Projects
+    </div>
+
+    <div class="table-wrapper">
+
+        <table>
+
+            <thead>
+
+                <tr>
+                    <th>Project</th>
+                    <th>Status</th>
+                    <th>Progress</th>
+                    <th>Deadline</th>
+                </tr>
+
+            </thead>
+
+            <tbody>
+
+            {% for project in projects %}
+
+                <tr>
+
+                    <td>
+                        {{ project.name }}
+                    </td>
+
+                    <td>
+                        {{ project.get_status_display }}
+                    </td>
+
+                    <td>
+
+                        {{ project.progress }}%
+
+                        <div class="project-progress">
+
+                            <div class="project-progress-fill"
+                                 style="width:{{ project.progress }}%;">
+                            </div>
+
+                        </div>
+
+                    </td>
+
+                    <td>
+                        {{ project.deadline }}
+                    </td>
+
+                </tr>
+
+            {% empty %}
+
+                <tr>
+
+                    <td colspan="4">
+                        No projects assigned.
+                    </td>
+
+                </tr>
+
+            {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</section>
+```
+
+</div>
+
+{% endblock %}

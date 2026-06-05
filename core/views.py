@@ -1,3 +1,5 @@
+from multiprocessing import context
+
 from django.contrib import messages
 from django.contrib.auth import views as auth_views
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -12,6 +14,7 @@ from django.views.generic import CreateView, DetailView, ListView, TemplateView,
 
 from .forms import (
     EmployeeForm,
+    EmployeeUpdateForm,
     LeaveApprovalForm,
     LeaveRequestForm,
     PerformanceReviewForm,
@@ -45,6 +48,8 @@ from .services import (
     task_anomaly_analysis,
     team_health_summary,
     upsert_ai_result,
+    team_analytics,
+    
 )
 
 
@@ -66,7 +71,13 @@ def get_visible_teams(user):
 
 def get_visible_employees(user):
     role = current_user_role(user)
-    queryset = Employee.objects.select_related('user', 'team')
+    queryset = Employee.objects.select_related(
+    'user',
+    'team'
+).prefetch_related(
+    'tasks',
+    'task_logs'
+)
     if role == AppRole.ADMIN:
         return queryset.all()
     if role == AppRole.MANAGER:
@@ -92,7 +103,17 @@ def get_visible_projects(user):
 
 def get_visible_tasks(user):
     role = current_user_role(user)
-    queryset = Task.objects.select_related('project', 'project__team', 'assigned_to', 'assigned_to__user')
+    queryset = Task.objects.select_related(
+    'project',
+    'project__team',
+    'assigned_to',
+    'assigned_to__user'
+).prefetch_related(
+    'logs',
+    'activities',
+    'attachments',
+    'requests'
+)
     if role == AppRole.ADMIN:
         return queryset.all()
     if role == AppRole.MANAGER:
@@ -118,7 +139,7 @@ def get_visible_requests(user):
 
 def get_visible_activities(user):
     role = current_user_role(user)
-    queryset = Activity.objects.select_related('user', 'task', 'project')
+    queryset = Activity.objects.select_related('user', 'task', 'project').exclude(activity_type=Activity.Type.NOTIFICATION)
     if role == AppRole.ADMIN:
         return queryset.all()
     if role == AppRole.MANAGER:
@@ -131,24 +152,8 @@ def get_visible_activities(user):
 
 
 class RoleTemplateMixin:
-    role_template_map = {
-        AppRole.ADMIN: 'admin',
-        AppRole.MANAGER: 'manager',
-        AppRole.EMPLOYEE: 'employee',
-    }
-
     def get_template_names(self):
-        names = list(super().get_template_names())
-        role_dir = self.role_template_map.get(current_user_role(self.request.user))
-        if not role_dir:
-            return names
-        role_specific = []
-        for name in names:
-            if name.startswith('core/'):
-                role_specific.append(f'{role_dir}/{name.split("/", 1)[1]}')
-            else:
-                role_specific.append(name)
-        return role_specific or names
+        return list(super().get_template_names())
 
 
 class RoleRequiredMixin(RoleTemplateMixin, LoginRequiredMixin):
@@ -177,15 +182,27 @@ class RolePasswordChangeDoneView(RoleTemplateMixin, auth_views.PasswordChangeDon
 
 
 class DashboardView(RoleLoginRequiredMixin, TemplateView):
-    template_name = 'core/dashboard.html'
+    def get_template_names(self):
+        role = current_user_role(self.request.user)
 
+        if role == AppRole.ADMIN:
+            return ['admin/dashboard.html']
+
+        elif role == AppRole.MANAGER:
+            return ['manager/dashboard.html']
+
+        return ['employee/dashboard.html']
+    
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         role = current_user_role(self.request.user)
         visible_tasks = get_visible_tasks(self.request.user)
         visible_projects = get_visible_projects(self.request.user)
         visible_requests = get_visible_requests(self.request.user)
-        notifications = get_visible_activities(self.request.user).filter(activity_type=Activity.Type.NOTIFICATION)[:6]
+        notifications = Activity.objects.filter(
+            activity_type=Activity.Type.NOTIFICATION,
+            user=self.request.user
+        )[:6]
 
         context.update(
             {
@@ -197,45 +214,209 @@ class DashboardView(RoleLoginRequiredMixin, TemplateView):
         )
 
         if role == AppRole.ADMIN:
-            context.update(dashboard_summary())
-            context['teams'] = get_visible_teams(self.request.user)[:6]
+            summary = dashboard_summary()
+
+            # Map burnout alerts to dictionaries for clean template access
+            burnout_alerts_list = []
+            for emp, data in summary['burnout_alerts']:
+                burnout_alerts_list.append({
+                    'employee': emp,
+                    'active_tasks': data['active_tasks'],
+                    'average_daily_hours': data['average_daily_hours'],
+                    'burnout_risk': data['burnout_risk'],
+                })
+
+            # Map top performers to dictionaries
+            top_performers_list = []
+            for emp, data in summary['top_performers']:
+                top_performers_list.append({
+                    'employee': emp,
+                    'tasks_completed': data['tasks_completed'],
+                    'avg_completion_time': data['avg_completion_time'],
+                    'completion_rate': data['completion_rate'],
+                })
+
+            # Get team summary metrics
+            team_summary = []
+            for team in Team.objects.select_related('manager').all():
+                team_summary.append({
+                    'team': team,
+                    'member_count': team.employees.count(),
+                    'project_count': team.projects.count(),
+                    'active_tasks': Task.objects.filter(
+                        project__team=team
+                    ).exclude(
+                        status=Task.Status.COMPLETED
+                    ).count(),
+                })
+
+            # Get project summary metrics
+            project_summary = []
+            for project in Project.objects.select_related('team').all():
+                project_summary.append({
+                    'project': project,
+                    'progress': project.progress,
+                })
+
+            # Calculate total completion rate
+            completed_tasks_count = Task.objects.filter(
+                status=Task.Status.COMPLETED
+            ).count()
+
+            total_tasks_count = Task.objects.count()
+
+            completion_rate = round(
+                (completed_tasks_count / total_tasks_count) * 100,
+                2
+            ) if total_tasks_count else 0.0
+
+            # Workload chart data
+            employees = Employee.objects.annotate(
+                active_task_count=Count(
+                    'tasks',
+                    filter=~Q(tasks__status=Task.Status.COMPLETED)
+                )
+            )[:8]
+
+            workload_chart = [
+                {
+                    'name': emp.name,
+                    'active_count': emp.active_task_count,
+                }
+                for emp in employees
+            ]
+
+            context.update(summary)
+
+            context.update({
+                'approval_queue': Task.objects.filter(
+                    status=Task.Status.SUBMITTED
+                )[:6],
+                'burnout_alerts': burnout_alerts_list,
+                'top_performers': top_performers_list,
+                'anomaly_tasks': [
+                    task
+                    for task in Task.objects.exclude(
+                        status=Task.Status.COMPLETED
+                    )
+                    if task_anomaly_analysis(task)['label'] != 'Low'
+                ][:6],
+                'total_users': User.objects.count(),
+                'team_summary': team_summary,
+                'project_summary': project_summary,
+                'upcoming_deadlines': Task.objects.exclude(
+                    status=Task.Status.COMPLETED
+                ).order_by('deadline')[:6],
+                'workload_chart': workload_chart,
+                'recent_logs': TaskLog.objects.select_related(
+                    'employee',
+                    'task'
+                )[:6],
+                'completion_rate': completion_rate,
+            })
+
+            context['teams'] = get_visible_teams(
+                self.request.user
+            )[:6]
+
         elif role == AppRole.MANAGER:
             employees = list(get_visible_employees(self.request.user))
-            employee_rows = [(employee, employee_metrics(employee)) for employee in employees]
+            employee_rows = [
+                (employee, employee_metrics(employee))
+                for employee in employees
+            ]
             managed_projects = list(visible_projects[:6])
+
+            # Map burnout alerts for Manager
+            burnout_alerts_list = []
+            for emp, data in employee_rows:
+                if data['burnout_risk'] != 'Low':
+                    burnout_alerts_list.append({
+                        'employee': emp,
+                        'active_tasks': data['active_tasks'],
+                        'burnout_risk': data['burnout_risk'],
+                    })
+
+            # Filter manager risks (delayed tasks)
+            manager_risks = []
+            for task in visible_tasks.exclude(
+                status=Task.Status.COMPLETED
+            ):
+                risk = predict_delay_risk(task)
+                if risk['label'] != 'Low':
+                    manager_risks.append((task, risk))
+
             context.update(
                 {
                     'managed_teams': get_visible_teams(self.request.user),
-                    'managed_projects': managed_projects,
-                    'team_members': employees,
+                    'managed_projects': visible_projects,
+                    'team_members': get_visible_employees(
+                        self.request.user
+                    ),
                     'team_summary': employee_rows[:6],
-                    'team_health_rows': [team_health_summary(team) for team in get_visible_teams(self.request.user)],
-                    'managed_project_ai': [project_ai_summary(project) for project in managed_projects],
-                    'pending_approvals': visible_requests.filter(
-                        request_type=Request.Type.TASK_APPROVAL,
-                        status=Request.Status.PENDING,
+                    'team_health_rows': [
+                        team_health_summary(team)
+                        for team in get_visible_teams(
+                            self.request.user
+                        )
+                    ],
+                    'managed_project_ai': [
+                        project_ai_summary(project)
+                        for project in managed_projects
+                    ],
+                    'pending_approvals': visible_tasks.filter(
+                        status=Task.Status.SUBMITTED
                     )[:6],
-                    'team_leave_requests': visible_requests.filter(request_type=Request.Type.LEAVE)[:5],
+                    'team_leave_requests': visible_requests.filter(
+                        request_type=Request.Type.LEAVE
+                    )[:5],
+                    'burnout_alerts': burnout_alerts_list[:6],
+                    'manager_risks': manager_risks[:6],
+                    'managed_tasks': visible_tasks.order_by(
+                        '-created_at'
+                    )[:6],
                 }
             )
+
         else:
             employee = get_employee_for_user(self.request.user)
             my_tasks = visible_tasks.order_by('deadline')
+
             context.update(
                 {
                     'employee_record': employee,
                     'my_tasks': my_tasks,
-                    'my_due_soon': my_tasks.exclude(status=Task.Status.COMPLETED)[:5],
-                    'my_completed_tasks': my_tasks.filter(status=Task.Status.COMPLETED).count(),
-                    'my_pending_tasks': my_tasks.exclude(status=Task.Status.COMPLETED).count(),
-                    'my_logs': TaskLog.objects.filter(employee=employee).select_related('task')[:8] if employee else [],
-                    'my_ai_results': [upsert_ai_result(task) for task in my_tasks[:5]],
-                    'my_metric': employee_metrics(employee) if employee else None,
-                    'my_ai_profile': employee_ai_profile(employee) if employee else None,
+                    'my_due_soon': my_tasks.exclude(
+                        status=Task.Status.COMPLETED
+                    )[:5],
+                    'my_completed_tasks': my_tasks.filter(
+                        status=Task.Status.COMPLETED
+                    ).count(),
+                    'my_pending_tasks': my_tasks.exclude(
+                        status=Task.Status.COMPLETED
+                    ).count(),
+                    'my_logs': (
+                        TaskLog.objects.filter(
+                            employee=employee
+                        ).select_related('task')[:8]
+                        if employee else []
+                    ),
+                    'my_ai_results': [
+                        upsert_ai_result(task)
+                        for task in my_tasks[:5]
+                    ],
+                    'my_metric': (
+                        employee_metrics(employee)
+                        if employee else None
+                    ),
+                    'my_ai_profile': (
+                        employee_ai_profile(employee)
+                        if employee else None
+                    ),
                 }
             )
-        return context
 
+        return context
 
 class ProfileUpdateView(RoleLoginRequiredMixin, UpdateView):
     model = User
@@ -262,7 +443,7 @@ class ProfileUpdateView(RoleLoginRequiredMixin, UpdateView):
 class UserListView(RoleRequiredMixin, ListView):
     allowed_roles = (AppRole.ADMIN,)
     model = User
-    template_name = 'core/user_list.html'
+    template_name = 'admin/user_list.html'
     context_object_name = 'users'
 
     def get_queryset(self):
@@ -288,14 +469,40 @@ class UserCreateView(RoleRequiredMixin, CreateView):
     allowed_roles = (AppRole.ADMIN,)
     model = User
     form_class = UserAccountForm
-    template_name = 'core/form.html'
+    template_name = 'admin/createuser.html'
     success_url = reverse_lazy('user-list')
 
     def form_valid(self, form):
         user = form.save()
-        send_credentials_email(user.email, user.username, user.generated_password, user.generated_role)
-        create_audit_log(self.request.user, 'created_user', 'User', user.id, user.username)
-        messages.success(self.request, 'User account created successfully.')
+
+        try:
+            send_credentials_email(
+                user.email,
+                user.username,
+                user.generated_password,
+                user.generated_role
+            )
+
+            messages.success(
+                self.request,
+                'User account created and credentials emailed.'
+            )
+
+        except Exception as exc:
+
+            messages.warning(
+                self.request,
+                f'User created successfully, but email delivery failed: {exc}'
+            )
+
+        create_audit_log(
+            self.request.user,
+            'created_user',
+            'User',
+            user.id,
+            user.username
+        )
+
         return redirect(self.success_url)
 
     def get_context_data(self, **kwargs):
@@ -308,7 +515,7 @@ class UserAdminUpdateView(RoleRequiredMixin, UpdateView):
     allowed_roles = (AppRole.ADMIN,)
     model = User
     form_class = UserAdminEditForm
-    template_name = 'core/form.html'
+    template_name = 'admin/user_update.html'
     success_url = reverse_lazy('user-list')
 
     def form_valid(self, form):
@@ -335,20 +542,65 @@ class UserToggleActiveView(RoleRequiredMixin, View):
         return redirect('user-list')
 
 
+from django.db.models import Count
+
 class TeamListView(RoleRequiredMixin, ListView):
-    allowed_roles = (AppRole.ADMIN, AppRole.MANAGER)
-    template_name = 'core/team_list.html'
-    context_object_name = 'teams'
+
+    allowed_roles = (
+        AppRole.ADMIN,
+        AppRole.MANAGER,
+    )
+
+    context_object_name = "teams"
+
+    def get_template_names(self):
+
+        role = current_user_role(self.request.user)
+
+        if role == AppRole.ADMIN:
+            return ["admin/team_list.html"]
+
+        return ["manager/team_list.html"]
 
     def get_queryset(self):
-        return get_visible_teams(self.request.user)
+
+        teams = get_visible_teams(
+            self.request.user
+        )
+
+        return teams.annotate(
+            member_count=Count(
+                "employees"
+            ),
+            project_count=Count(
+                "projects"
+            )
+        )
+
+    def get_context_data(self, **kwargs):
+
+        context = super().get_context_data(
+            **kwargs
+        )
+
+        context["employee_count"] = (
+            Employee.objects.count()
+        )
+
+        context["manager_count"] = (
+            User.objects.filter(
+                managed_teams__isnull=False
+            ).distinct().count()
+        )
+
+        return context
 
 
 class TeamCreateView(RoleRequiredMixin, CreateView):
     allowed_roles = (AppRole.ADMIN,)
     model = Team
     form_class = TeamForm
-    template_name = 'core/form.html'
+    template_name = 'admin/team_create.html'
     success_url = reverse_lazy('team-list')
 
     def form_valid(self, form):
@@ -367,7 +619,7 @@ class TeamUpdateView(RoleRequiredMixin, UpdateView):
     allowed_roles = (AppRole.ADMIN,)
     model = Team
     form_class = TeamForm
-    template_name = 'core/form.html'
+    template_name = 'admin/team_update.html'
     success_url = reverse_lazy('team-list')
 
     def form_valid(self, form):
@@ -382,41 +634,352 @@ class TeamUpdateView(RoleRequiredMixin, UpdateView):
         return context
 
 
-class EmployeeListView(RoleRequiredMixin, ListView):
-    allowed_roles = (AppRole.ADMIN, AppRole.MANAGER, AppRole.EMPLOYEE)
-    template_name = 'core/employee_list.html'
-    context_object_name = 'employees'
+class TeamDetailView(RoleRequiredMixin, DetailView):
+
+    allowed_roles = (
+        AppRole.ADMIN,
+        AppRole.MANAGER,
+        AppRole.EMPLOYEE
+    )
+
+    model = Team
+    context_object_name = "team"
+
+    def get_template_names(self):
+
+        role = current_user_role(self.request.user)
+
+        if role == AppRole.ADMIN:
+            return ["admin/team_detail.html"]
+
+        elif role == AppRole.MANAGER:
+            return ["manager/team_detail.html"]
+
+        return ["employee/team_detail.html"]
 
     def get_queryset(self):
-        return get_visible_employees(self.request.user)
+
+        role = current_user_role(self.request.user)
+
+        if role == AppRole.ADMIN:
+            return Team.objects.select_related(
+                "manager"
+            ).prefetch_related(
+                "employees",
+                "projects"
+            )
+
+        return Team.objects.select_related(
+            "manager"
+        ).prefetch_related(
+            "employees",
+            "projects"
+        ).filter(
+            manager=self.request.user
+        )
+
+    def get_context_data(self, **kwargs):
+
+        context = super().get_context_data(**kwargs)
+
+        team = self.object
+
+        projects = team.projects.all()
+
+        employees = team.employees.all()
+
+        active_tasks = Task.objects.filter(
+            project__team=team
+        ).exclude(
+            status=Task.Status.COMPLETED
+        ).count()
+
+        completed_tasks = Task.objects.filter(
+            project__team=team,
+            status=Task.Status.COMPLETED
+        ).count()
+
+        health = team_health_summary(team)
+
+        analytics = team_analytics(team)
+
+        member_performance = []
+
+        for employee in employees:
+
+            profile = employee_ai_profile(employee)
+
+            member_performance.append({
+
+                "employee": employee,
+
+                "productivity_score":
+                    profile["productivity_score"],
+
+                "completed_tasks":
+                    profile["tasks_completed"],
+
+                "active_tasks":
+                    profile["active_tasks"],
+
+                "burnout_risk":
+                    profile["burnout_risk"],
+
+            })
+
+        context.update({
+
+            "employees":
+                employees,
+
+            "projects":
+                projects,
+
+            "employee_count":
+                employees.count(),
+
+            "project_count":
+                projects.count(),
+
+            "active_tasks":
+                active_tasks,
+
+            "completed_tasks":
+                completed_tasks,
+
+            "team_health":
+                health,
+
+            "team_analytics":
+                analytics,
+
+            "member_performance":
+                member_performance,
+
+        })
+    
+        return context
+
+
+from django.views.generic import FormView
+from django import forms
+
+
+class TeamMemberForm(forms.Form):
+    employee = forms.ModelChoiceField(
+        queryset=Employee.objects.none()
+    )
+
+    def __init__(self, *args, **kwargs):
+        team = kwargs.pop("team")
+        super().__init__(*args, **kwargs)
+
+        self.fields["employee"].queryset = Employee.objects.filter(
+            team__isnull=True
+        )
+
+
+class TeamAddMemberView(RoleRequiredMixin, FormView):
+
+    allowed_roles = (
+        AppRole.ADMIN,
+        AppRole.MANAGER,
+    )
+
+    template_name = "core/form.html"
+    form_class = TeamMemberForm
+
+    def dispatch(self, request, *args, **kwargs):
+
+        self.team = get_object_or_404(
+            Team,
+            pk=kwargs["team_pk"]
+        )
+
+        if (
+            current_user_role(request.user)
+            == AppRole.MANAGER
+            and self.team.manager != request.user
+        ):
+            raise PermissionDenied()
+
+        return super().dispatch(
+            request,
+            *args,
+            **kwargs
+        )
+
+    def get_form_kwargs(self):
+
+        kwargs = super().get_form_kwargs()
+
+        kwargs["team"] = self.team
+
+        return kwargs
+
+    def form_valid(self, form):
+
+        employee = form.cleaned_data["employee"]
+
+        employee.team = self.team
+
+        employee.save()
+
+        messages.success(
+            self.request,
+            "Employee added successfully."
+        )
+
+        return redirect(
+            "team-detail",
+            pk=self.team.pk
+        )
+
+
+class TeamRemoveMemberView(RoleRequiredMixin, View):
+
+    allowed_roles = (
+        AppRole.ADMIN,
+        AppRole.MANAGER,
+    )
+
+    def post(self, request, *args, **kwargs):
+
+        team = get_object_or_404(
+            Team,
+            pk=kwargs["team_pk"]
+        )
+
+        if (
+            current_user_role(request.user)
+            == AppRole.MANAGER
+            and team.manager != request.user
+        ):
+            raise PermissionDenied()
+
+        employee = get_object_or_404(
+            Employee,
+            pk=kwargs["employee_pk"],
+            team=team
+        )
+
+        employee.team = None
+
+        employee.save()
+
+        messages.success(
+            request,
+            "Employee removed from team."
+        )
+
+        return redirect(
+            "team-detail",
+            pk=team.pk
+        )
+
+class EmployeeListView(RoleRequiredMixin, ListView):
+
+    allowed_roles = (
+        AppRole.ADMIN,
+        AppRole.MANAGER,
+    )
+
+    context_object_name = 'employees'
+
+    def get_template_names(self):
+
+        role = current_user_role(self.request.user)
+
+        if role == AppRole.ADMIN:
+            return ['admin/employee_list.html']
+
+        return ['manager/employee_list.html']
+
+    def get_queryset(self):
+
+        return get_visible_employees(
+            self.request.user
+        )
+
+    def get_context_data(self, **kwargs):
+
+        context = super().get_context_data(**kwargs)
+
+        employees = context['employees']
+
+        context['employee_count'] = employees.count()
+
+        context['available_count'] = employees.filter(
+            availability=Employee.Availability.AVAILABLE
+        ).count()
+
+        context['busy_count'] = employees.filter(
+            availability=Employee.Availability.BUSY
+        ).count()
+
+        context['leave_count'] = employees.filter(
+            availability=Employee.Availability.ON_LEAVE
+        ).count()
+
+        return context
 
 
 class EmployeeCreateView(RoleRequiredMixin, CreateView):
     allowed_roles = (AppRole.ADMIN,)
     model = Employee
     form_class = EmployeeForm
-    template_name = 'core/form.html'
-    success_url = reverse_lazy('employee-list')
+    template_name = "admin/form.html"
+    success_url = reverse_lazy(
+        "employee-list")
 
     def form_valid(self, form):
+
         employee = form.save()
-        if employee.created_user:
-            send_credentials_email(employee.email, employee.created_user.username, employee.created_password, AppRole.EMPLOYEE)
-        create_audit_log(self.request.user, 'created_employee', 'Employee', employee.id, employee.name)
-        messages.success(self.request, 'Employee created successfully.')
-        return redirect(self.success_url)
+
+        try:
+
+            send_credentials_email(
+                employee.email,
+                employee.created_user.username,
+                employee.created_password,
+                AppRole.EMPLOYEE
+            )
+
+        except Exception:
+            pass
+
+        create_audit_log(
+            self.request.user,
+            "created_employee",
+            "Employee",
+            employee.id,
+            employee.name
+        )
+
+        messages.success(
+            self.request,
+            "Employee created successfully."
+        )
+
+        return redirect(
+            self.success_url
+        )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = 'Create Employee'
+
+        context["title"] = "Create Employee"
+
         return context
+
+
 
 
 class EmployeeUpdateView(RoleRequiredMixin, UpdateView):
     allowed_roles = (AppRole.ADMIN,)
     model = Employee
-    form_class = EmployeeForm
-    template_name = 'core/form.html'
+    form_class = EmployeeUpdateForm
+    template_name = 'admin/employee_update.html'
     success_url = reverse_lazy('employee-list')
 
     def form_valid(self, form):
@@ -431,20 +994,228 @@ class EmployeeUpdateView(RoleRequiredMixin, UpdateView):
         return context
 
 
+
+class EmployeeDetailView(RoleRequiredMixin, DetailView):
+
+    allowed_roles = (AppRole.ADMIN,)
+
+    model = Employee
+
+    context_object_name = "employee"
+
+    template_name = "admin/employee_detail.html"
+
+    def get_context_data(self, **kwargs):
+
+        context = super().get_context_data(**kwargs)
+
+        employee = self.object
+
+        ai_profile = employee_ai_profile(employee)
+
+        recent_tasks = (
+            employee.tasks
+            .select_related("project")
+            .order_by("-created_at")[:10]
+        )
+
+        context.update({
+
+            "ai_profile":
+                ai_profile,
+
+            "recent_tasks":
+                recent_tasks,
+
+            "total_tasks":
+                employee.tasks.count(),
+
+            "completed_tasks":
+                ai_profile["tasks_completed"],
+
+            "active_tasks":
+                ai_profile["active_tasks"],
+
+            "delayed_tasks":
+                ai_profile["delayed_tasks"],
+
+        })
+
+        return context
+
+
+
 class ProjectListView(RoleRequiredMixin, ListView):
-    allowed_roles = (AppRole.ADMIN, AppRole.MANAGER, AppRole.EMPLOYEE)
-    template_name = 'core/project_list.html'
-    context_object_name = 'projects'
+
+    allowed_roles = (
+        AppRole.ADMIN,
+        AppRole.MANAGER,
+        AppRole.EMPLOYEE,
+    )
+
+    model = Project
+
+    context_object_name = "projects"
+
+    def get_template_names(self):
+
+        role = current_user_role(
+            self.request.user
+        )
+
+        if role == AppRole.ADMIN:
+            return [
+                "admin/project_list.html"
+            ]
+
+        elif role == AppRole.MANAGER:
+            return [
+                "manager/project_list.html"
+            ]
+
+        return [
+            "employee/project_list.html"
+        ]
 
     def get_queryset(self):
-        return get_visible_projects(self.request.user)
+
+        role = current_user_role(
+            self.request.user
+        )
+
+        queryset = get_visible_projects(
+            self.request.user
+        ).select_related(
+            "team",
+            "team__manager"
+        )
+
+        if role == AppRole.MANAGER:
+
+            queryset = queryset.filter(
+                team__manager=self.request.user
+            )
+
+        elif role == AppRole.EMPLOYEE:
+
+            employee = getattr(
+                self.request.user,
+                "employee_profile",
+                None
+            )
+
+            if employee:
+
+                queryset = queryset.filter(
+                    tasks__assigned_to=employee
+                ).distinct()
+
+            else:
+
+                queryset = Project.objects.none()
+
+        return queryset
+
+    def get_context_data(self, **kwargs):
+
+        context = super().get_context_data(
+            **kwargs
+        )
+
+        role = current_user_role(
+            self.request.user
+        )
+
+        projects = context["projects"]
+
+        total_projects = projects.count()
+
+        completed_projects = projects.filter(
+            status=Project.Status.COMPLETED
+        ).count()
+
+        active_projects = projects.exclude(
+            status=Project.Status.COMPLETED
+        ).count()
+
+        overdue_projects = projects.filter(
+            deadline__lt=timezone.now().date()
+        ).exclude(
+            status=Project.Status.COMPLETED
+        ).count()
+
+        context.update({
+
+            "is_admin_role":
+                role == AppRole.ADMIN,
+
+            "is_manager_role":
+                role == AppRole.MANAGER,
+
+            "is_employee_role":
+                role == AppRole.EMPLOYEE,
+
+            "total_projects":
+                total_projects,
+
+            "completed_projects":
+                completed_projects,
+
+            "active_projects":
+                active_projects,
+
+            "overdue_projects":
+                overdue_projects,
+
+        })
+
+        if role == AppRole.MANAGER:
+
+            team = Team.objects.filter(
+                manager=self.request.user
+            ).first()
+
+            context["managed_team"] = team
+
+        if role == AppRole.EMPLOYEE:
+
+            employee = getattr(
+                self.request.user,
+                "employee_profile",
+                None
+            )
+
+            if employee:
+
+                my_tasks = Task.objects.filter(
+                    assigned_to=employee
+                )
+
+                context.update({
+
+                    "my_tasks":
+                        my_tasks.count(),
+
+                    "my_completed_tasks":
+                        my_tasks.filter(
+                            status=Task.Status.COMPLETED
+                        ).count(),
+
+                    "my_pending_tasks":
+                        my_tasks.exclude(
+                            status=Task.Status.COMPLETED
+                        ).count(),
+
+                })
+
+        return context
 
 
 class ProjectCreateView(RoleRequiredMixin, CreateView):
     allowed_roles = (AppRole.ADMIN,)
     model = Project
     form_class = ProjectForm
-    template_name = 'core/form.html'
+    template_name = 'admin/project_create.html'
     success_url = reverse_lazy('project-list')
 
     def form_valid(self, form):
@@ -459,23 +1230,290 @@ class ProjectCreateView(RoleRequiredMixin, CreateView):
         return context
 
 
+from django.http import JsonResponse
+from .services import recommend_team_for_project
+
+class ProjectRecommendationView(
+    RoleRequiredMixin,
+    View
+):
+
+    allowed_roles = (
+        AppRole.ADMIN,
+    )
+
+    def post(
+        self,
+        request,
+        *args,
+        **kwargs
+    ):
+
+        skills = request.POST.get(
+            "skills",
+            ""
+        )
+
+        recommendation = (
+            recommend_team_for_project(
+                skills
+            )
+        )
+
+        if not recommendation:
+
+            return JsonResponse({
+
+                "success": False
+
+            })
+
+        return JsonResponse({
+
+            "success": True,
+
+            "team":
+                recommendation[
+                    "team"
+                ].name,
+
+            "team_id":
+                recommendation[
+                    "team"
+                ].id,
+
+            "score":
+                recommendation[
+                    "score"
+                ],
+
+            "skill_match":
+                recommendation[
+                    "skill_match"
+                ],
+
+            "availability":
+                recommendation[
+                    "availability"
+                ],
+
+            "experience":
+                recommendation[
+                    "experience"
+                ],
+
+            "workload":
+                recommendation[
+                    "workload"
+                ],
+        })
+
+
 class ProjectUpdateView(RoleRequiredMixin, UpdateView):
-    allowed_roles = (AppRole.ADMIN,)
+
+    allowed_roles = (
+        AppRole.ADMIN,
+    )
+
     model = Project
+
     form_class = ProjectForm
-    template_name = 'core/form.html'
-    success_url = reverse_lazy('project-list')
+
+    template_name = "admin/project_update.html"
+
+    success_url = reverse_lazy(
+        "project-list"
+    )
 
     def form_valid(self, form):
-        project = form.save()
-        create_audit_log(self.request.user, 'updated_project', 'Project', project.id, project.name)
-        messages.success(self.request, 'Project updated successfully.')
-        return redirect(self.success_url)
+
+        response = super().form_valid(
+            form
+        )
+
+        create_audit_log(
+            self.request.user,
+            "updated_project",
+            "Project",
+            self.object.id,
+            self.object.name
+        )
+
+        messages.success(
+            self.request,
+            "Project updated successfully."
+        )
+
+        return response
 
     def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['title'] = 'Edit Project'
+
+        context = super().get_context_data(
+            **kwargs
+        )
+
+        context["title"] = (
+            "Edit Project"
+        )
+
         return context
+
+from .services import workload_percentage
+
+class ProjectDetailView(RoleRequiredMixin, DetailView):
+
+    allowed_roles = (
+        AppRole.ADMIN,
+        AppRole.MANAGER,
+        AppRole.EMPLOYEE,
+    )
+
+    model = Project
+
+    context_object_name = "project"
+
+    def get_template_names(self):
+
+        role = current_user_role(self.request.user)
+
+        if role == AppRole.ADMIN:
+            return ["admin/project_detail.html"]
+
+        elif role == AppRole.MANAGER:
+            return ["manager/project_detail.html"]
+
+        return ["employee/project_detail.html"]
+
+    def get_queryset(self):
+
+        return get_visible_projects(
+            self.request.user
+        )
+
+    def get_context_data(self, **kwargs):
+
+        context = super().get_context_data(**kwargs)
+
+        project = self.object
+
+        tasks = Task.objects.filter(
+            project=project
+        ).select_related(
+            "assigned_to"
+        )
+        role = current_user_role(self.request.user)
+
+        if role == AppRole.EMPLOYEE:
+
+            tasks = tasks.filter(
+                assigned_to__user=self.request.user
+            )
+
+        total_tasks = tasks.count()
+
+        completed_tasks = tasks.filter(
+            status=Task.Status.COMPLETED
+        ).count()
+
+        in_progress_tasks = tasks.filter(
+            status=Task.Status.IN_PROGRESS
+        ).count()
+
+        pending_tasks = tasks.filter(
+            status=Task.Status.PENDING
+        ).count()
+
+        overdue_tasks = tasks.exclude(
+            status=Task.Status.COMPLETED
+        ).filter(
+            deadline__lt=timezone.now().date()
+        ).count()
+
+        progress_percentage = (
+            round(
+                (completed_tasks / total_tasks) * 100,
+                1
+            )
+            if total_tasks else 0
+        )
+
+        team_members = (
+            project.team.employees.all()
+            if project.team
+            else Employee.objects.none()
+        )
+
+        member_stats = []
+
+        for member in team_members:
+
+            assigned_count = tasks.filter(
+                assigned_to=member
+            ).count()
+
+            completed_count = tasks.filter(
+                assigned_to=member,
+                status=Task.Status.COMPLETED
+            ).count()
+
+            workload = workload_percentage(member)
+
+            member_stats.append({
+
+                "employee": member,
+
+                "assigned": assigned_count,
+
+                "completed": completed_count,
+
+                "workload": workload,
+
+            })
+
+        ai_summary = project_ai_summary(project)
+
+        team_health = (
+            team_health_summary(project.team)
+            if project.team
+            else None
+        )
+
+        team_analytics_data = (
+            team_analytics(project.team)
+            if project.team
+            else None
+        )
+
+        context.update({
+
+            "tasks": tasks,
+
+            "team_members": team_members,
+
+            "total_tasks": total_tasks,
+
+            "completed_tasks": completed_tasks,
+
+            "in_progress_tasks": in_progress_tasks,
+
+            "pending_tasks": pending_tasks,
+
+            "overdue_tasks": overdue_tasks,
+
+            "progress_percentage": progress_percentage,
+
+            "member_stats": member_stats,
+
+            "ai_summary": ai_summary,
+
+            "team_health": team_health,
+
+            "team_analytics": team_analytics_data,
+
+        })
+
+        return context
+
 
 
 class PlanningHubView(RoleRequiredMixin, TemplateView):
@@ -496,37 +1534,72 @@ class PlanningHubView(RoleRequiredMixin, TemplateView):
 
 
 class TaskListView(RoleRequiredMixin, ListView):
-    allowed_roles = (AppRole.ADMIN, AppRole.MANAGER, AppRole.EMPLOYEE)
-    template_name = 'core/task_list.html'
+
+    allowed_roles = (
+        AppRole.ADMIN,
+        AppRole.MANAGER,
+        AppRole.EMPLOYEE
+    )
+
     context_object_name = 'tasks'
 
+    def get_template_names(self):
+
+        role = current_user_role(self.request.user)
+
+        if role == AppRole.ADMIN:
+            return ['admin/task_list.html']
+
+        elif role == AppRole.MANAGER:
+            return ['manager/task_list.html']
+
+        return ['employee/task_list.html']
+
     def get_queryset(self):
+
         queryset = get_visible_tasks(self.request.user)
+
         project_id = self.request.GET.get('project')
         assignment = self.request.GET.get('assignment')
         status = self.request.GET.get('status')
 
         if project_id:
             queryset = queryset.filter(project_id=project_id)
+
         if assignment == 'assigned':
-            queryset = queryset.filter(assigned_to__isnull=False)
+            queryset = queryset.filter(
+                assigned_to__isnull=False
+            )
+
         elif assignment == 'unassigned':
-            queryset = queryset.filter(assigned_to__isnull=True)
+            queryset = queryset.filter(
+                assigned_to__isnull=True
+            )
+
         if status:
             queryset = queryset.filter(status=status)
+
         return queryset
 
     def get_context_data(self, **kwargs):
+
         context = super().get_context_data(**kwargs)
-        context['projects'] = get_visible_projects(self.request.user)
-        context['current_role'] = current_user_role(self.request.user)
+
+        context['projects'] = get_visible_projects(
+            self.request.user
+        )
+
+        context['current_role'] = current_user_role(
+            self.request.user
+        )
+
         context['filters'] = {
             'project': self.request.GET.get('project', ''),
             'assignment': self.request.GET.get('assignment', ''),
             'status': self.request.GET.get('status', ''),
         }
-        return context
 
+        return context
 
 class KanbanBoardView(TaskListView):
     template_name = 'core/kanban.html'
@@ -569,7 +1642,17 @@ class TaskCreateView(RoleRequiredMixin, CreateView):
 class TaskDetailView(RoleRequiredMixin, DetailView):
     allowed_roles = (AppRole.ADMIN, AppRole.MANAGER, AppRole.EMPLOYEE)
     model = Task
-    template_name = 'core/task_detail.html'
+    def get_template_names(self):
+
+        role = self.request.user.role
+
+        if role == "ADMIN":
+            return ["admin/task_detail.html"]
+
+        elif role == "MANAGER":
+            return ["manager/task_detail.html"]
+
+        return ["employee/task_detail.html"]
     context_object_name = 'task'
 
     def get_queryset(self):
@@ -742,8 +1825,19 @@ class TaskLogCreateView(RoleRequiredMixin, CreateView):
         employee = form.cleaned_data['employee']
         task = form.cleaned_data['task']
         role = current_user_role(self.request.user)
-        if role == AppRole.EMPLOYEE and task.assigned_to_id != employee.id:
-            raise PermissionDenied('You can only log work for your own assigned tasks.')
+        if role == AppRole.EMPLOYEE:
+
+            if task.assigned_to_id != employee.id:
+                raise PermissionDenied(
+                    "You can only log work for your assigned tasks."
+                )
+
+        elif role == AppRole.MANAGER:
+
+            if employee.team.manager != self.request.user:
+                raise PermissionDenied(
+                    "You cannot log work for employees outside your team."
+                )
 
         task_log = form.save()
         progress = form.cleaned_data.get('progress_after_log')
@@ -757,15 +1851,29 @@ class TaskLogCreateView(RoleRequiredMixin, CreateView):
             sync_project_status(task.project)
 
         if task.requires_approval and task.status == Task.Status.SUBMITTED:
-            approval_request, created = Request.objects.get_or_create(
+            existing_request = Request.objects.filter(
+            request_type=Request.Type.TASK_APPROVAL,
+            task=task,
+            status=Request.Status.PENDING
+        ).first()
+
+        if not existing_request:
+
+            Request.objects.create(
                 request_type=Request.Type.TASK_APPROVAL,
                 task=task,
                 employee=employee,
+                raised_by=self.request.user,
                 status=Request.Status.PENDING,
-                defaults={'raised_by': self.request.user, 'remarks': 'Submitted for manager approval.'},
+                remarks='Submitted for manager approval.'
             )
-            if created and task.project.team and task.project.team.manager:
-                create_notification(task.project.team.manager, 'Task submitted for approval', f'{task.title} is ready for review.')
+
+            if task.project.team and task.project.team.manager:
+                create_notification(
+                    task.project.team.manager,
+                    'Task submitted for approval',
+                    f'{task.title} is ready for review.'
+                )
 
         create_audit_log(self.request.user, 'logged_work', 'TaskLog', task_log.id, task.title)
         messages.success(self.request, 'Work log saved successfully.')
@@ -874,9 +1982,8 @@ class NotificationListView(RoleRequiredMixin, ListView):
     allowed_roles = (AppRole.ADMIN, AppRole.MANAGER, AppRole.EMPLOYEE)
     template_name = 'core/notification_list.html'
     context_object_name = 'notifications'
-
     def get_queryset(self):
-        return get_visible_activities(self.request.user).filter(activity_type=Activity.Type.NOTIFICATION, user=self.request.user)
+        return Activity.objects.filter(activity_type=Activity.Type.NOTIFICATION, user=self.request.user)
 
 
 class LeaveRequestListView(RoleRequiredMixin, ListView):

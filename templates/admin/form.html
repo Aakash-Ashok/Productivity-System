@@ -1,2 +1,291 @@
 {% extends 'admin/adminbase.html' %}
-{% block content %}{% include 'partials/form_content.html' %}{% endblock %}
+
+{% block title %}
+Create Employee | Productivity System
+{% endblock %}
+
+{% block content %}
+
+<style>
+
+.employee-form-container{
+    max-width:1200px;
+    margin:auto;
+}
+
+.employee-header{
+    background:linear-gradient(135deg,#2563eb,#1d4ed8);
+    color:white;
+    padding:32px;
+    border-radius:20px;
+    margin-bottom:25px;
+}
+
+.employee-header h2{
+    margin:0;
+    font-size:32px;
+    font-weight:700;
+}
+
+.employee-header p{
+    margin-top:10px;
+    opacity:.9;
+}
+
+.help-box{
+    background:#eff6ff;
+    border-left:5px solid #2563eb;
+    padding:18px;
+    border-radius:12px;
+    margin-bottom:25px;
+    color:#1e3a8a;
+}
+
+.form-card{
+    background:white;
+    border-radius:20px;
+    padding:30px;
+    border:1px solid #e5e7eb;
+    box-shadow:0 10px 25px rgba(0,0,0,.05);
+}
+
+.section-title{
+    font-size:20px;
+    font-weight:700;
+    color:#111827;
+    margin-bottom:20px;
+    padding-bottom:10px;
+    border-bottom:2px solid #f3f4f6;
+}
+
+.form-grid{
+    display:grid;
+    grid-template-columns:repeat(2,1fr);
+    gap:22px;
+}
+
+.form-group{
+    display:flex;
+    flex-direction:column;
+}
+
+.form-group.full{
+    grid-column:1 / -1;
+}
+
+.form-group label{
+    margin-bottom:8px;
+    font-size:14px;
+    font-weight:600;
+    color:#374151;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea{
+    width:100%;
+    padding:12px 14px;
+    border:1px solid #d1d5db;
+    border-radius:10px;
+    font-size:14px;
+    transition:.3s;
+}
+
+.form-group textarea{
+    min-height:120px;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus{
+    outline:none;
+    border-color:#2563eb;
+    box-shadow:0 0 0 4px rgba(37,99,235,.12);
+}
+
+.action-bar{
+    margin-top:30px;
+    display:flex;
+    justify-content:flex-end;
+    gap:15px;
+}
+
+.btn{
+    padding:12px 22px;
+    border-radius:10px;
+    text-decoration:none;
+    font-weight:600;
+    border:none;
+    cursor:pointer;
+}
+
+.btn-secondary{
+    background:#f3f4f6;
+    color:#374151;
+}
+
+.btn-primary{
+    background:#2563eb;
+    color:white;
+}
+
+.btn-primary:hover{
+    background:#1d4ed8;
+}
+
+.errorlist{
+    color:#dc2626;
+    list-style:none;
+    margin-top:6px;
+    padding-left:0;
+    font-size:13px;
+}
+
+.helptext{
+    display:block;
+    margin-top:6px;
+    font-size:12px;
+    color:#6b7280;
+}
+
+@media(max-width:768px){
+
+    .form-grid{
+        grid-template-columns:1fr;
+    }
+
+}
+
+</style>
+
+<div class="employee-form-container">
+
+```
+<div class="employee-header">
+    <h2>Create Employee</h2>
+    <p>Create an employee profile and login account in one step.</p>
+</div>
+
+<div class="help-box">
+    A login account will automatically be created and assigned the Employee role.
+    The generated credentials can be emailed to the employee.
+</div>
+
+<div class="form-card">
+
+    <form method="post">
+
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+            <div class="help-box" style="background:#fef2f2;border-left-color:#dc2626;color:#991b1b;">
+                {{ form.non_field_errors }}
+            </div>
+        {% endif %}
+
+        <div class="section-title">
+            Login Account
+        </div>
+
+        <div class="form-grid">
+
+            <div class="form-group">
+                <label>Username</label>
+                {{ form.username }}
+                {{ form.username.errors }}
+            </div>
+
+            <div class="form-group">
+                <label>Password</label>
+                {{ form.password }}
+                {% if form.password.help_text %}
+                    <small class="helptext">
+                        {{ form.password.help_text }}
+                    </small>
+                {% endif %}
+
+                {{ form.password.errors }}
+            </div>
+
+        </div>
+
+        <br>
+
+        <div class="section-title">
+            Employee Information
+        </div>
+
+        <div class="form-grid">
+
+            <div class="form-group">
+                <label>Employee Name</label>
+                {{ form.name }}
+                {{ form.name.errors }}
+            </div>
+
+            <div class="form-group">
+                <label>Email Address</label>
+                {{ form.email }}
+                {{ form.email.errors }}
+            </div>
+
+            <div class="form-group">
+                <label>Team</label>
+                {{ form.team }}
+                {{ form.team.errors }}
+            </div>
+
+            <div class="form-group">
+                <label>Job Title</label>
+                {{ form.job_title }}
+                {{ form.job_title.errors }}
+            </div>
+
+            <div class="form-group">
+                <label>Experience (Years)</label>
+                {{ form.experience }}
+                {{ form.experience.errors }}
+            </div>
+
+            <div class="form-group">
+                <label>Weekly Capacity Hours</label>
+                {{ form.weekly_capacity_hours }}
+                {{ form.weekly_capacity_hours.errors }}
+            </div>
+
+            <div class="form-group">
+                <label>Availability</label>
+                {{ form.availability }}
+                {{ form.availability.errors }}
+            </div>
+
+            <div class="form-group full">
+                <label>Skills</label>
+                {{ form.skills }}
+                {{ form.skills.errors }}
+            </div>
+
+        </div>
+
+        <div class="action-bar">
+
+            <a href="{% url 'employee-list' %}"
+               class="btn btn-secondary">
+                Cancel
+            </a>
+
+            <button type="submit"
+                    class="btn btn-primary">
+                Create Employee
+            </button>
+
+        </div>
+
+    </form>
+
+</div>
+```
+
+</div>
+
+{% endblock %}

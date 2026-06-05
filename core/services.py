@@ -42,7 +42,7 @@ def send_credentials_email(email: str, username: str, password: str, role: str) 
         f'Password: {password}\n\n'
         f'Please sign in and change your password after first login.'
     )
-    send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [email], fail_silently=True)
+    send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [email], fail_silently=False)
 
 
 def create_activity(
@@ -506,3 +506,211 @@ def upsert_ai_result(task: Task) -> AIResult:
         },
     )
     return ai_result
+
+
+
+def recommend_team_for_project(required_skills):
+
+    required = {
+        skill.strip().lower()
+        for skill in required_skills.split(",")
+        if skill.strip()
+    }
+
+    teams = Team.objects.prefetch_related(
+        "employees"
+    )
+
+    recommendations = []
+
+    for team in teams:
+
+        employees = team.employees.all()
+
+        if not employees.exists():
+            continue
+
+        team_skills = set()
+
+        available_count = 0
+
+        total_experience = 0
+
+        active_tasks = 0
+
+        for employee in employees:
+
+            team_skills.update(
+                employee.skill_list
+            )
+
+            total_experience += (
+                employee.experience
+            )
+
+            if employee.availability == (
+                Employee.Availability.AVAILABLE
+            ):
+                available_count += 1
+
+            active_tasks += (
+                employee.tasks.exclude(
+                    status=Task.Status.COMPLETED
+                ).count()
+            )
+
+        skill_match = len(
+            required.intersection(
+                team_skills
+            )
+        )
+
+        skill_score = (
+            skill_match /
+            max(len(required), 1)
+        ) * 100
+
+        workload_score = max(
+            0,
+            100 - active_tasks * 8
+        )
+
+        availability_score = (
+            available_count /
+            employees.count()
+        ) * 100
+
+        experience_score = min(
+            total_experience,
+            100
+        )
+
+        final_score = (
+            skill_score * 0.5 +
+            workload_score * 0.2 +
+            availability_score * 0.15 +
+            experience_score * 0.15
+        )
+
+        recommendations.append({
+
+            "team": team,
+
+            "score": round(
+                final_score,
+                2
+            ),
+
+            "skill_match": round(
+                skill_score,
+                2
+            ),
+
+            "availability": available_count,
+
+            "experience": total_experience,
+
+            "workload": active_tasks,
+        })
+
+    recommendations.sort(
+        key=lambda x: x["score"],
+        reverse=True
+    )
+
+    return recommendations[0] if recommendations else None
+
+
+
+from django.db.models import Avg
+
+def team_analytics(team):
+
+    employees = team.employees.all()
+
+    available_members = employees.filter(
+        availability=Employee.Availability.AVAILABLE
+    ).count()
+
+    busy_members = employees.filter(
+        availability=Employee.Availability.BUSY
+    ).count()
+
+    overloaded_members = employees.filter(
+        availability=Employee.Availability.OVERLOADED
+    ).count()
+
+    leave_members = employees.filter(
+        availability=Employee.Availability.ON_LEAVE
+    ).count()
+
+    avg_experience = (
+        employees.aggregate(
+            avg=Avg("experience")
+        )["avg"] or 0
+    )
+
+    productivity_scores = []
+
+    total_active_tasks = 0
+    total_completed_tasks = 0
+
+    for employee in employees:
+
+        profile = employee_ai_profile(employee)
+
+        productivity_scores.append(
+            profile["productivity_score"]
+        )
+
+        total_active_tasks += profile["active_tasks"]
+
+        total_completed_tasks += profile["tasks_completed"]
+
+    avg_productivity = (
+        round(
+            sum(productivity_scores) / len(productivity_scores),
+            1
+        )
+        if productivity_scores
+        else 0
+    )
+
+    return {
+        "available_members": available_members,
+        "busy_members": busy_members,
+        "overloaded_members": overloaded_members,
+        "leave_members": leave_members,
+        "avg_experience": round(avg_experience, 1),
+        "avg_productivity": avg_productivity,
+        "total_active_tasks": total_active_tasks,
+        "total_completed_tasks": total_completed_tasks,
+    }
+
+
+def workload_percentage(employee):
+
+    active_tasks = Task.objects.filter(
+        assigned_to=employee
+    ).exclude(
+        status=Task.Status.COMPLETED
+    )
+
+    total_hours = sum(
+        float(task.estimated_hours)
+        for task in active_tasks
+    )
+
+    capacity = float(
+        employee.weekly_capacity_hours
+    )
+
+    if capacity <= 0:
+        return 0
+
+    return min(
+        round(
+            (total_hours / capacity) * 100
+        ),
+        100
+    )

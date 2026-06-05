@@ -1,2 +1,339 @@
 {% extends 'admin/adminbase.html' %}
-{% block content %}{% include 'partials/project_list_content.html' %}{% endblock %}
+
+{% block title %}
+Projects | Admin Dashboard
+{% endblock %}
+
+{% block content %}
+
+<style>
+
+.project-container{
+    max-width:1400px;
+    margin:auto;
+}
+
+.hero{
+    background:linear-gradient(135deg,#2563eb,#1d4ed8);
+    color:white;
+    padding:35px;
+    border-radius:20px;
+    margin-bottom:25px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+}
+
+.hero h2{
+    margin:0;
+    font-size:34px;
+}
+
+.hero p{
+    margin-top:10px;
+    opacity:.9;
+}
+
+.btn{
+    padding:12px 18px;
+    border-radius:10px;
+    text-decoration:none;
+    font-weight:600;
+}
+
+.btn-primary{
+    background:white;
+    color:#2563eb;
+}
+
+.stats-grid{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:20px;
+    margin-bottom:25px;
+}
+
+.stat-card{
+    background:white;
+    padding:25px;
+    border-radius:16px;
+    box-shadow:0 4px 15px rgba(0,0,0,.08);
+}
+
+.stat-card h2{
+    margin:0;
+    color:#2563eb;
+    font-size:34px;
+}
+
+.stat-card p{
+    margin-top:10px;
+    color:#64748b;
+}
+
+.panel{
+    background:white;
+    border-radius:16px;
+    padding:25px;
+    box-shadow:0 4px 15px rgba(0,0,0,.08);
+}
+
+.panel-title{
+    font-size:22px;
+    font-weight:700;
+    margin-bottom:20px;
+}
+
+table{
+    width:100%;
+    border-collapse:collapse;
+}
+
+thead{
+    background:#f1f5f9;
+}
+
+th,td{
+    padding:14px;
+    text-align:left;
+    border-bottom:1px solid #e5e7eb;
+}
+
+.badge{
+    padding:6px 10px;
+    border-radius:20px;
+    font-size:12px;
+    font-weight:600;
+}
+
+.status-completed{
+    background:#dcfce7;
+    color:#166534;
+}
+
+.status-progress{
+    background:#dbeafe;
+    color:#1d4ed8;
+}
+
+.status-pending{
+    background:#fef3c7;
+    color:#92400e;
+}
+
+.progress{
+    width:100%;
+    height:10px;
+    background:#e5e7eb;
+    border-radius:20px;
+    overflow:hidden;
+}
+
+.progress-fill{
+    height:100%;
+    background:#10b981;
+}
+
+.action-buttons{
+    display:flex;
+    gap:8px;
+}
+
+.btn-view{
+    background:#2563eb;
+    color:white;
+    padding:8px 12px;
+    border-radius:8px;
+    text-decoration:none;
+}
+
+.btn-edit{
+    background:#f59e0b;
+    color:white;
+    padding:8px 12px;
+    border-radius:8px;
+    text-decoration:none;
+}
+
+</style>
+
+<div class="project-container">
+
+
+<div class="hero">
+
+    <div>
+
+        <h2>Project Portfolio</h2>
+
+        <p>
+            Manage all projects, monitor delivery status,
+            deadlines and overall progress.
+        </p>
+
+    </div>
+
+    <a href="{% url 'project-create' %}"
+       class="btn btn-primary">
+
+        + Create Project
+
+    </a>
+
+</div>
+
+<div class="stats-grid">
+
+    <div class="stat-card">
+        <h2>{{ total_projects }}</h2>
+        <p>Total Projects</p>
+    </div>
+
+    <div class="stat-card">
+        <h2>{{ active_projects }}</h2>
+        <p>Active Projects</p>
+    </div>
+
+    <div class="stat-card">
+        <h2>{{ completed_projects }}</h2>
+        <p>Completed Projects</p>
+    </div>
+
+    <div class="stat-card">
+        <h2>{{ overdue_projects }}</h2>
+        <p>Overdue Projects</p>
+    </div>
+
+</div>
+
+<div class="panel">
+
+    <div class="panel-title">
+
+        Project Directory
+
+    </div>
+
+    <table>
+
+        <thead>
+
+            <tr>
+                <th>Project</th>
+                <th>Team</th>
+                <th>Manager</th>
+                <th>Status</th>
+                <th>Deadline</th>
+                <th>Progress</th>
+                <th>Actions</th>
+            </tr>
+
+        </thead>
+
+        <tbody>
+
+        {% for project in projects %}
+
+            <tr>
+
+                <td>
+                    <strong>{{ project.name }}</strong>
+                </td>
+
+                <td>
+                    {{ project.team.name }}
+                </td>
+
+                <td>
+                    {{ project.team.manager.username }}
+                </td>
+
+                <td>
+
+    {% if project.status == "completed" %}
+
+        <span class="badge status-completed">
+            {{ project.get_status_display }}
+        </span>
+
+    {% elif project.status == "active" %}
+
+        <span class="badge status-progress">
+            {{ project.get_status_display }}
+        </span>
+
+    {% elif project.status == "planning" %}
+
+        <span class="badge status-pending">
+            {{ project.get_status_display }}
+        </span>
+
+    {% else %}
+
+        <span class="badge">
+            {{ project.get_status_display }}
+        </span>
+
+    {% endif %}
+
+</td>
+
+                <td>
+                    {{ project.deadline }}
+                </td>
+
+                <td style="width:180px;">
+
+                    {{ project.progress }}%
+
+                    <div class="progress">
+
+                        <div class="progress-fill"
+                             style="width:{{ project.progress }}%;">
+                        </div>
+
+                    </div>
+
+                </td>
+
+                <td>
+
+                    <div class="action-buttons">
+
+                        <a href="{% url 'project-detail' project.pk %}"
+                           class="btn-view">
+                            View
+                        </a>
+
+                        <a href="{% url 'project-update' project.pk %}"
+                           class="btn-edit">
+                            Edit
+                        </a>
+
+                    </div>
+
+                </td>
+
+            </tr>
+
+        {% empty %}
+
+            <tr>
+
+                <td colspan="7">
+                    No projects found.
+                </td>
+
+            </tr>
+
+        {% endfor %}
+
+        </tbody>
+
+    </table>
+
+</div>
+
+</div>
+
+{% endblock %}

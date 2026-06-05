@@ -1,0 +1,423 @@
+{% extends 'admin/adminbase.html' %}
+
+{% block content %}
+
+<style>
+
+.page-wrapper{
+    display:flex;
+    flex-direction:column;
+    gap:24px;
+}
+
+.profile-card,
+.section-card{
+    background:white;
+    border:1px solid #e5e7eb;
+    border-radius:22px;
+    padding:24px;
+}
+
+.profile-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+}
+
+.profile-info{
+    display:flex;
+    align-items:center;
+    gap:18px;
+}
+
+.avatar{
+    width:70px;
+    height:70px;
+    border-radius:18px;
+    background:#111827;
+    color:white;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:24px;
+    font-weight:700;
+}
+
+.employee-name{
+    font-size:28px;
+    font-weight:700;
+    color:#111827;
+}
+
+.employee-role{
+    color:#6b7280;
+}
+
+.edit-btn{
+    background:#111827;
+    color:white;
+    text-decoration:none;
+    padding:10px 16px;
+    border-radius:10px;
+}
+
+.stats-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+    gap:18px;
+}
+
+.stat-card{
+    background:white;
+    border:1px solid #e5e7eb;
+    border-radius:18px;
+    padding:20px;
+}
+
+.stat-card span{
+    color:#6b7280;
+    font-size:13px;
+}
+
+.stat-card h3{
+    margin-top:8px;
+    font-size:28px;
+    color:#111827;
+}
+
+.info-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:24px;
+}
+
+.info-row{
+    display:flex;
+    justify-content:space-between;
+    padding:10px 0;
+    border-bottom:1px solid #f3f4f6;
+}
+
+.section-title{
+    font-size:20px;
+    font-weight:700;
+    margin-bottom:18px;
+    color:#111827;
+}
+
+.badge{
+    display:inline-block;
+    padding:7px 12px;
+    border-radius:999px;
+    background:#f3f4f6;
+    margin:4px;
+    font-size:13px;
+}
+
+.ai-score{
+    font-size:48px;
+    font-weight:700;
+    color:#111827;
+}
+
+.low{
+    color:#16a34a;
+}
+
+.medium{
+    color:#d97706;
+}
+
+.high{
+    color:#dc2626;
+}
+
+.table-wrapper{
+    overflow-x:auto;
+}
+
+table{
+    width:100%;
+    border-collapse:collapse;
+}
+
+thead{
+    background:#f9fafb;
+}
+
+th,td{
+    padding:14px;
+    text-align:left;
+    border-bottom:1px solid #f3f4f6;
+}
+
+.progress{
+    width:100%;
+    height:8px;
+    background:#e5e7eb;
+    border-radius:999px;
+    overflow:hidden;
+}
+
+.progress-fill{
+    background:#111827;
+    height:100%;
+}
+
+</style>
+
+<div class="page-wrapper">
+
+    <section class="profile-card">
+
+        <div class="profile-header">
+
+            <div class="profile-info">
+
+                <div class="avatar">
+                    {{ employee.name|first|upper }}
+                </div>
+
+                <div>
+
+                    <div class="employee-name">
+                        {{ employee.name }}
+                    </div>
+
+                    <div class="employee-role">
+                        {{ employee.job_title }}
+                    </div>
+
+                </div>
+
+            </div>
+
+            <a href="{% url 'employee-update' employee.pk %}"
+               class="edit-btn">
+                Edit Employee
+            </a>
+
+        </div>
+
+    </section>
+
+    <section class="stats-grid">
+
+        <article class="stat-card">
+            <span>Productivity Score</span>
+            <h3>{{ ai_profile.productivity_score }}</h3>
+        </article>
+
+        <article class="stat-card">
+            <span>Completion Rate</span>
+            <h3>{{ ai_profile.completion_rate }}%</h3>
+        </article>
+
+        <article class="stat-card">
+            <span>Completed Tasks</span>
+            <h3>{{ completed_tasks }}</h3>
+        </article>
+
+        <article class="stat-card">
+            <span>Active Tasks</span>
+            <h3>{{ active_tasks }}</h3>
+        </article>
+
+        <article class="stat-card">
+            <span>Delayed Tasks</span>
+            <h3>{{ delayed_tasks }}</h3>
+        </article>
+
+        <article class="stat-card">
+            <span>Daily Hours</span>
+            <h3>{{ ai_profile.average_daily_hours }}</h3>
+        </article>
+
+    </section>
+
+    <div class="info-grid">
+
+        <section class="section-card">
+
+            <div class="section-title">
+                Employee Information
+            </div>
+
+            <div class="info-row">
+                <strong>Email</strong>
+                <span>{{ employee.email }}</span>
+            </div>
+
+            <div class="info-row">
+                <strong>Team</strong>
+                <span>{{ employee.team.name }}</span>
+            </div>
+
+            <div class="info-row">
+                <strong>Experience</strong>
+                <span>{{ employee.experience }} Years</span>
+            </div>
+
+            <div class="info-row">
+                <strong>Availability</strong>
+                <span>{{ employee.get_availability_display }}</span>
+            </div>
+
+            <div class="info-row">
+                <strong>Capacity</strong>
+                <span>{{ employee.weekly_capacity_hours }} hrs/week</span>
+            </div>
+
+        </section>
+
+        <section class="section-card">
+
+            <div class="section-title">
+                Skills
+            </div>
+
+            {% for skill in employee.skill_list %}
+                <span class="badge">
+                    {{ skill }}
+                </span>
+            {% empty %}
+                <p>No skills recorded.</p>
+            {% endfor %}
+
+        </section>
+
+    </div>
+
+    <div class="info-grid">
+
+        <section class="section-card">
+
+            <div class="section-title">
+                AI Insights
+            </div>
+
+            <div class="ai-score">
+                {{ ai_profile.productivity_score }}
+            </div>
+
+            <div class="info-row">
+                <strong>Focus Area</strong>
+                <span>{{ ai_profile.focus_area }}</span>
+            </div>
+
+            <div class="info-row">
+                <strong>Burnout Risk</strong>
+
+                <span class="
+                {% if ai_profile.burnout_risk == 'Low' %}
+                    low
+                {% elif ai_profile.burnout_risk == 'Medium' %}
+                    medium
+                {% else %}
+                    high
+                {% endif %}
+                ">
+                    {{ ai_profile.burnout_risk }}
+                </span>
+
+            </div>
+
+        </section>
+
+        <section class="section-card">
+
+            <div class="section-title">
+                Learning Priorities
+            </div>
+
+            {% for skill in ai_profile.learning_priority %}
+
+                <span class="badge">
+                    {{ skill }}
+                </span>
+
+            {% empty %}
+
+                <p>
+                    No learning recommendations.
+                </p>
+
+            {% endfor %}
+
+        </section>
+
+    </div>
+
+    <section class="section-card">
+
+        <div class="section-title">
+            Recent Tasks
+        </div>
+
+        <div class="table-wrapper">
+
+            <table>
+
+                <thead>
+
+                    <tr>
+                        <th>Task</th>
+                        <th>Project</th>
+                        <th>Status</th>
+                        <th>Progress</th>
+                        <th>Deadline</th>
+                    </tr>
+
+                </thead>
+
+                <tbody>
+
+                {% for task in recent_tasks %}
+
+                    <tr>
+
+                        <td>{{ task.title }}</td>
+
+                        <td>{{ task.project.name }}</td>
+
+                        <td>{{ task.get_status_display }}</td>
+
+                        <td>
+
+                            {{ task.progress }}%
+
+                            <div class="progress">
+
+                                <div class="progress-fill"
+                                     style="width:{{ task.progress }}%;">
+                                </div>
+
+                            </div>
+
+                        </td>
+
+                        <td>{{ task.deadline }}</td>
+
+                    </tr>
+
+                {% empty %}
+
+                    <tr>
+                        <td colspan="5">
+                            No tasks assigned.
+                        </td>
+                    </tr>
+
+                {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </section>
+
+</div>
+
+{% endblock %}

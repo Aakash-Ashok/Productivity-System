@@ -7,6 +7,7 @@ from .views import (
     CalendarView,
     DashboardView,
     EmployeeCreateView,
+    EmployeeDetailView,
     EmployeeListView,
     EmployeeUpdateView,
     KanbanBoardView,
@@ -19,7 +20,9 @@ from .views import (
     PlanningHubView,
     ProfileUpdateView,
     ProjectCreateView,
+    ProjectDetailView,
     ProjectListView,
+    ProjectRecommendationView,
     ProjectUpdateView,
     TaskApprovalUpdateView,
     TaskAttachmentCreateView,
@@ -30,12 +33,15 @@ from .views import (
     TaskLogCreateView,
     TaskUpdateView,
     TeamCreateView,
+    TeamDetailView,
     TeamListView,
     TeamUpdateView,
     UserAdminUpdateView,
     UserCreateView,
     UserListView,
     UserToggleActiveView,
+    TeamAddMemberView,
+    TeamRemoveMemberView,
 )
 
 urlpatterns = [
@@ -74,4 +80,42 @@ urlpatterns = [
     path('leave-requests/new/', LeaveRequestCreateView.as_view(), name='leave-request-create'),
     path('leave-requests/<int:pk>/review/', LeaveApprovalUpdateView.as_view(), name='leave-request-review'),
     path('audit-logs/', AuditLogListView.as_view(), name='audit-log-list'),
+    path(
+    "teams/<int:pk>/",
+    TeamDetailView.as_view(),
+    name="team-detail"
+),
+path(
+    'teams/<int:team_pk>/add-member/',
+    TeamAddMemberView.as_view(),
+    name='team-add-member'
+),
+
+path(
+    'teams/<int:team_pk>/remove-member/<int:employee_pk>/',
+    TeamRemoveMemberView.as_view(),
+    name='team-remove-member'
+),
+
+path(
+    "projects/<int:pk>/",
+    ProjectDetailView.as_view(),
+    name="project-detail"
+),
+
+path(
+    "projects/recommend-team/",
+    ProjectRecommendationView.as_view(),
+    name="recommend-team",
+), 
+
+path(
+    "employees/<int:pk>/",
+    EmployeeDetailView.as_view(),
+    name="employee-detail"
+),
+
 ]
+
+
+

@@ -1,0 +1,361 @@
+{% extends 'admin/adminbase.html' %}
+
+{% block title %}
+Edit Project
+{% endblock %}
+
+{% block content %}
+
+<style>
+
+.page-wrapper{
+    max-width:1100px;
+    margin:auto;
+}
+
+.hero{
+    background:linear-gradient(135deg,#f59e0b,#d97706);
+    color:white;
+    padding:30px;
+    border-radius:20px;
+    margin-bottom:25px;
+}
+
+.hero h2{
+    margin:0;
+    font-size:32px;
+}
+
+.hero p{
+    margin-top:10px;
+    opacity:.9;
+}
+
+.content-grid{
+    display:grid;
+    grid-template-columns:2fr 1fr;
+    gap:25px;
+}
+
+.card{
+    background:white;
+    border-radius:18px;
+    padding:25px;
+    box-shadow:0 4px 15px rgba(0,0,0,.08);
+}
+
+.section-title{
+    font-size:22px;
+    font-weight:700;
+    margin-bottom:20px;
+}
+
+.form-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:20px;
+}
+
+.form-group{
+    display:flex;
+    flex-direction:column;
+}
+
+.form-group.full{
+    grid-column:1/-1;
+}
+
+.form-group label{
+    margin-bottom:8px;
+    font-weight:600;
+    color:#374151;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea{
+    width:100%;
+    padding:12px;
+    border:1px solid #d1d5db;
+    border-radius:10px;
+    font-size:14px;
+    box-sizing:border-box;
+}
+
+.form-group textarea{
+    min-height:120px;
+    resize:vertical;
+}
+
+.errorlist{
+    color:#dc2626;
+    list-style:none;
+    padding:0;
+    margin-top:8px;
+}
+
+.action-bar{
+    display:flex;
+    justify-content:flex-end;
+    gap:12px;
+    margin-top:30px;
+}
+
+.btn{
+    padding:12px 18px;
+    border-radius:10px;
+    text-decoration:none;
+    font-weight:600;
+    border:none;
+    cursor:pointer;
+}
+
+.btn-primary{
+    background:#f59e0b;
+    color:white;
+}
+
+.btn-secondary{
+    background:#f3f4f6;
+    color:#374151;
+}
+
+.project-avatar{
+    width:90px;
+    height:90px;
+    border-radius:20px;
+    background:#f59e0b;
+    color:white;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:36px;
+    font-weight:700;
+    margin:auto;
+}
+
+.project-name{
+    text-align:center;
+    margin-top:15px;
+    font-size:22px;
+    font-weight:700;
+}
+
+.info-box{
+    background:#f8fafc;
+    border-radius:12px;
+    padding:15px;
+    margin-top:15px;
+}
+
+.info-box strong{
+    display:block;
+    margin-bottom:6px;
+}
+
+@media(max-width:900px){
+
+    .content-grid{
+        grid-template-columns:1fr;
+    }
+
+    .form-grid{
+        grid-template-columns:1fr;
+    }
+
+}
+
+</style>
+
+<div class="page-wrapper">
+
+    <div class="hero">
+
+        <h2>
+            Edit Project
+        </h2>
+
+        <p>
+            Update project information, team assignment,
+            deadline and requirements.
+        </p>
+
+    </div>
+
+    <div class="content-grid">
+
+        <div class="card">
+
+            <div class="section-title">
+
+                Project Information
+
+            </div>
+
+            <form method="post">
+
+                {% csrf_token %}
+
+                <div class="form-grid">
+
+                    <div class="form-group">
+
+                        <label>
+                            Project Name
+                        </label>
+
+                        {{ form.name }}
+
+                        {{ form.name.errors }}
+
+                    </div>
+
+                    <div class="form-group">
+
+                        <label>
+                            Team
+                        </label>
+
+                        {{ form.team }}
+
+                        {{ form.team.errors }}
+
+                    </div>
+
+                    <div class="form-group">
+
+                        <label>
+                            Deadline
+                        </label>
+
+                        {{ form.deadline }}
+
+                        {{ form.deadline.errors }}
+
+                    </div>
+
+                    <div class="form-group">
+
+                        <label>
+                            Status
+                        </label>
+
+                        {{ form.status }}
+
+                        {{ form.status.errors }}
+
+                    </div>
+
+                    <div class="form-group full">
+
+                        <label>
+                            Required Skills
+                        </label>
+
+                        {{ form.required_skills }}
+
+                        {{ form.required_skills.errors }}
+
+                    </div>
+
+                    <div class="form-group full">
+
+                        <label>
+                            Description
+                        </label>
+
+                        {{ form.description }}
+
+                        {{ form.description.errors }}
+
+                    </div>
+
+                </div>
+
+                <div class="action-bar">
+
+                    <a href="{% url 'project-detail' object.pk %}"
+                       class="btn btn-secondary">
+
+                        Cancel
+
+                    </a>
+
+                    <button type="submit"
+                            class="btn btn-primary">
+
+                        Update Project
+
+                    </button>
+
+                </div>
+
+            </form>
+
+        </div>
+
+        <div class="card">
+
+            <div class="project-avatar">
+
+                {{ object.name|slice:":1"|upper }}
+
+            </div>
+
+            <div class="project-name">
+
+                {{ object.name }}
+
+            </div>
+
+            <div class="info-box">
+
+                <strong>
+                    Current Team
+                </strong>
+
+                {% if object.team %}
+                    {{ object.team.name }}
+                {% else %}
+                    Not Assigned
+                {% endif %}
+
+            </div>
+
+            <div class="info-box">
+
+                <strong>
+                    Status
+                </strong>
+
+                {{ object.get_status_display }}
+
+            </div>
+
+            <div class="info-box">
+
+                <strong>
+                    Progress
+                </strong>
+
+                {{ object.progress }}%
+
+            </div>
+
+            <div class="info-box">
+
+                <strong>
+                    Deadline
+                </strong>
+
+                {{ object.deadline }}
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}
